@@ -42,6 +42,10 @@ class MiddlemanViewModel(private val store: KeyValueStore, defaultServer: String
     private var client = MiddlemanClient(_state.value.serverUrl)
     private var token: String? = store[KEY_TOKEN]
     private var streamJob: Job? = null
+    /** In-flight requests. Cancelled on leave so a late reply from an old mediation can't paint over a new one. */
+    private val actions = mutableSetOf<Job>()
+    /** Which mediation the current token belongs to; views from any other are ignored. */
+    private var sessionId: String? = null
 
     init { token?.let { startStreaming(it) } }
 
@@ -61,13 +65,16 @@ class MiddlemanViewModel(private val store: KeyValueStore, defaultServer: String
 
     private fun forget(ending: Ending?) {
         streamJob?.cancel()
+        actions.toList().forEach { it.cancel() }
         token = null
+        sessionId = null
         store[KEY_TOKEN] = null
         _state.update { UiState(serverUrl = it.serverUrl, ending = ending) }
     }
 
     private fun signIn(c: Credentials) {
         token = c.token
+        sessionId = c.sessionId
         store[KEY_TOKEN] = c.token
         _state.update { it.copy(inviteCode = null) }
         startStreaming(c.token)
@@ -91,8 +98,12 @@ class MiddlemanViewModel(private val store: KeyValueStore, defaultServer: String
                 if (token == null) return@launch
                 _state.update { it.copy(connected = false) }
                 // The stream may have dropped because the mediation is gone; ask once before retrying.
+                // Only a definite "gone" clears the token; outages and proxy errors just retry.
                 runCatching { show(client.session(t)) }.onFailure {
-                    if (it is MiddlemanException) { forget(Ending(com.hereliesaz.middleman.model.EndReason.RESOLVED, "This mediation has ended. Everything said in it has been deleted.")); return@launch }
+                    if (it is MiddlemanException && it.isFinal) {
+                        forget(Ending(com.hereliesaz.middleman.model.EndReason.RESOLVED, "This mediation has ended. Everything said in it has been deleted."))
+                        return@launch
+                    }
                 }
                 delay(backoff)
                 backoff = (backoff * 2).coerceAtMost(30_000)
@@ -101,6 +112,8 @@ class MiddlemanViewModel(private val store: KeyValueStore, defaultServer: String
     }
 
     private fun show(view: SessionView) {
+        if (sessionId != null && view.sessionId != sessionId) return
+        if (sessionId == null) sessionId = view.sessionId
         view.ending?.let { forget(it); return }
         _state.update { it.copy(session = view) }
     }
@@ -109,7 +122,7 @@ class MiddlemanViewModel(private val store: KeyValueStore, defaultServer: String
 
     private fun act(block: suspend () -> Unit) {
         if (_state.value.busy) return
-        viewModelScope.launch {
+        val job = viewModelScope.launch {
             _state.update { it.copy(busy = true, error = null) }
             try {
                 block()
@@ -120,6 +133,8 @@ class MiddlemanViewModel(private val store: KeyValueStore, defaultServer: String
                 _state.update { it.copy(busy = false) }
             }
         }
+        actions += job
+        job.invokeOnCompletion { actions -= job }
     }
 
     private companion object {

@@ -26,7 +26,7 @@ import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.takeWhile
 import java.io.File
 
@@ -59,7 +59,8 @@ fun Route.middlemanRoutes(service: MediationService, store: SessionStore) {
             ?: return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Not signed in."))
         var ended = false
         service.changes
-            .onStart { emit(Change(principal.sessionId)) }
+            // Subscribe first, then snapshot: a change racing the first send is never lost.
+            .onSubscription { emit(Change(principal.sessionId)) }
             .filter { it.sessionId == principal.sessionId }
             .takeWhile { !ended }
             .collect { change ->

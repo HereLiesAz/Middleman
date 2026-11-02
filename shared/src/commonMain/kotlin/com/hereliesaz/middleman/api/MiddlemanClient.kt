@@ -23,7 +23,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 
-class MiddlemanException(message: String) : Exception(message)
+/**
+ * An error from the server. [status] is the HTTP status, or 0 when there was no response.
+ * Only [isFinal] errors mean the session or token is gone; anything else may be a passing outage.
+ */
+class MiddlemanException(message: String, val status: Int = 0) : Exception(message) {
+    val isFinal: Boolean get() = status == 401 || status == 404
+}
 
 val MiddlemanJson = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
 
@@ -41,7 +47,7 @@ class MiddlemanClient(private val baseUrl: String, engine: HttpClient = HttpClie
                 // 101 is the WebSocket handshake succeeding, not an error.
                 if (!r.status.isSuccess() && r.status != HttpStatusCode.SwitchingProtocols) {
                     val msg = runCatching { r.body<ApiError>().error }.getOrNull() ?: r.status.description
-                    throw MiddlemanException(msg)
+                    throw MiddlemanException(msg, r.status.value)
                 }
             }
         }
