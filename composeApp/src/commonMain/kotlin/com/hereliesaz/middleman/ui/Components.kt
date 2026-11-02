@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.middleman.model.Readiness
 
 @Composable
 fun Field(
@@ -68,15 +67,3 @@ fun Tab(text: String, selected: Boolean, onClick: () -> Unit) = Column(Modifier.
     Box(Modifier.padding(top = 6.dp).height(1.dp).fillMaxWidth().background(if (selected) Ink.Light else Ink.Void))
 }
 
-/** A thin line that fills toward the threshold, with the threshold marked by a tick. */
-@Composable
-fun ReadinessLine(r: Readiness, modifier: Modifier = Modifier) = Column(modifier) {
-    Box(Modifier.fillMaxWidth().height(7.dp)) {
-        Box(Modifier.align(Alignment.Center).fillMaxWidth().height(1.dp).background(Ink.Ash))
-        Box(Modifier.align(Alignment.CenterStart).fillMaxWidth(r.score / 100f).height(2.dp).background(if (r.ready) Ink.Light else Ink.Bone))
-        Box(Modifier.fillMaxWidth(Readiness.THRESHOLD / 100f).height(7.dp)) {
-            Box(Modifier.align(Alignment.CenterEnd).width(1.dp).height(7.dp).background(Ink.Fog))
-        }
-    }
-    Text(r.summary, style = MaterialTheme.typography.bodyMedium, color = Ink.Fog, modifier = Modifier.padding(top = 8.dp))
-}

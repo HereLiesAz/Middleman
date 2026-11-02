@@ -20,10 +20,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hereliesaz.middleman.KeyValueStore
 import com.hereliesaz.middleman.MiddlemanViewModel
 
-/** Root of every platform. Platforms differ only in [store] and the server they default to. */
+/**
+ * Root of every platform. Platforms differ only in [store], the server they default to, and
+ * whether they were opened from an invite link ([inviteCode]).
+ */
 @Composable
-fun App(store: KeyValueStore, defaultServer: String) = MiddlemanTheme {
-    val vm = viewModel { MiddlemanViewModel(store, defaultServer) }
+fun App(store: KeyValueStore, defaultServer: String, inviteCode: String? = null) = MiddlemanTheme {
+    val vm = viewModel { MiddlemanViewModel(store, defaultServer, inviteCode) }
     val state by vm.state.collectAsStateWithLifecycle()
     var showingExamples by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
@@ -36,6 +39,7 @@ fun App(store: KeyValueStore, defaultServer: String) = MiddlemanTheme {
     Box(Modifier.fillMaxSize().safeDrawingPadding()) {
         val session = state.session
         when {
+            state.ending != null -> EndedScreen(state.ending!!, onDone = vm::dismissEnding)
             showingExamples -> ExamplesScreen(onBack = { showingExamples = false })
             !state.signedIn -> ThresholdScreen(state, vm, onExamples = { showingExamples = true })
             session == null -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = Ink.Bone)

@@ -3,8 +3,8 @@ package com.hereliesaz.middleman.model
 import kotlinx.serialization.Serializable
 
 /**
- * A person in a mediation. A session has two or more; there is no "partner A / B".
- * Two is the minimum number of people it takes to fight. There is no maximum.
+ * A person in a mediation. Two is the minimum number of people it takes to fight; there is no maximum.
+ * The one who started it asked for space: "talk to me through Middleman until you can be respectful."
  */
 @Serializable
 data class Participant(
@@ -14,13 +14,12 @@ data class Participant(
 )
 
 /**
- * One utterance in a room.
+ * One line in someone's room. Every participant has exactly one room, shared only with Middleman.
  *
- * @property authorId the participant who wrote it, or `null` when Middleman speaks.
- * @property onBehalfOf set when Middleman relays a consented, reframed bridge for a participant.
- * @property visibleTo when non-null, only this participant may ever see the message. Used for
- *   joint-room messages that Middleman held back, and for the private coaching that follows them.
- * @property held the author's words were stopped before reaching anyone else.
+ * @property authorId who wrote it; `null` when Middleman speaks.
+ * @property relayFrom set on Middleman's messages that carry someone else's words, paraphrased.
+ * @property deliveredAs on your own message: what Middleman actually told the others.
+ * @property withheld on your own message: why nothing from it was passed on.
  */
 @Serializable
 data class Message(
@@ -30,10 +29,9 @@ data class Message(
     val sentAt: Long,
     val insight: Insight? = null,
     val alerts: List<CleanFightRule> = emptyList(),
-    val onBehalfOf: String? = null,
-    val visibleTo: String? = null,
-    val held: Boolean = false,
-    val bridged: Boolean = false,
+    val relayFrom: String? = null,
+    val deliveredAs: String? = null,
+    val withheld: String? = null,
 )
 
 /** The two layers of every fight: what it's about, and what it's actually about. */
@@ -44,10 +42,7 @@ data class ContentVsFeelings(val content: String, val feelings: String)
 @Serializable
 data class IntentSandwich(val anchorOfCare: String, val vulnerableTruth: String, val reassurance: String)
 
-/**
- * Middleman's contrastruction of a private statement. Never leaves the speaker's room,
- * except [bridge], and only when the speaker explicitly asks for it to be delivered.
- */
+/** Middleman's contrastruction of a private statement. Never leaves the speaker's room. */
 @Serializable
 data class Insight(
     val validation: String,
@@ -58,45 +53,30 @@ data class Insight(
     val layers: ContentVsFeelings,
     val sandwich: IntentSandwich,
     val clarifyingQuestion: String,
-    val bridge: String? = null,
 )
 
-/** How close the room is to being safe for everyone at once. All values 0–100. */
 @Serializable
-data class Readiness(
-    val deescalation: Int,
-    val empathy: Int,
-    val sharedGoals: Int,
-    val score: Int,
-    val ready: Boolean,
-    val summary: String,
-) {
-    companion object {
-        const val THRESHOLD = 70
-        val EMPTY = Readiness(10, 10, 10, 10, false, "Waiting for everyone to arrive.")
-    }
-}
+enum class EndReason { RESOLVED, EXPIRED, REPLACED }
 
-/** A breathing pause someone called. Nobody may post to the joint room until it ends. */
+/** The last thing a session says before it is deleted. */
 @Serializable
-data class Timeout(val calledBy: String, val endsAt: Long)
+data class Ending(val reason: EndReason, val note: String)
 
 /**
- * Everything one participant is allowed to know about a session. The server builds this per
- * viewer; other participants' private rooms and needs are never included.
+ * Everything one participant may know about a session. Built per viewer by the server; nobody
+ * else's room is ever included. When [ending] is set, this is the final frame: the session no
+ * longer exists on the server.
  */
 @Serializable
 data class SessionView(
     val sessionId: String,
     val title: String,
     val inviteCode: String,
+    val link: String,
+    val starterId: String,
     val you: Participant,
     val participants: List<Participant>,
-    val privateRoom: List<Message>,
-    val jointRoom: List<Message>,
-    val yourNeeds: List<String>,
-    val commonGround: List<String>,
-    val readiness: Readiness,
-    val jointUnlocked: Boolean,
-    val timeout: Timeout? = null,
+    val room: List<Message>,
+    val expiresAt: Long? = null,
+    val ending: Ending? = null,
 )
