@@ -4,7 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * Ze Frank's rules of engagement ("How to Fight as a Couple"), plus contempt.
- * [holds] rules stop a joint-room message before it reaches anyone; the rest only annotate.
+ * Middleman uses them to decide what to soften in a relay. A message that is nothing but [holds]
+ * violations is not passed on at all.
  */
 @Serializable
 enum class CleanFightRule(val holds: Boolean, val note: String) {

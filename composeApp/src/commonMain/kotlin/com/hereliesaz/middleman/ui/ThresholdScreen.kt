@@ -27,16 +27,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.middleman.MiddlemanViewModel
 import com.hereliesaz.middleman.UiState
+import com.hereliesaz.middleman.api.inviteCodeFrom
 
 private enum class Door { START, JOIN }
 
 /** The way in. Start a mediation and hand out the code, or walk in with one. */
 @Composable
 fun ThresholdScreen(state: UiState, vm: MiddlemanViewModel, onExamples: () -> Unit) {
-    var door by remember { mutableStateOf(Door.START) }
+    var door by remember { mutableStateOf(if (state.inviteCode != null) Door.JOIN else Door.START) }
     var name by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf(state.inviteCode.orEmpty()) }
+    var expiry by remember { mutableStateOf<Int?>(null) }
     var editingServer by remember { mutableStateOf(false) }
     var server by remember(state.serverUrl) { mutableStateOf(state.serverUrl) }
 
@@ -48,7 +50,7 @@ fun ThresholdScreen(state: UiState, vm: MiddlemanViewModel, onExamples: () -> Un
             Text("MIDDLEMAN", style = MaterialTheme.typography.displayLarge, maxLines = 1, softWrap = false)
             Spacer(Modifier.height(16.dp))
             Text(
-                "Say it to me first.\nI'll make sure it arrives as what you meant.",
+                "Talk to me, not at each other.\nI'll carry what matters, and leave the rest.",
                 style = MiddlemanAside, textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(48.dp))
@@ -63,17 +65,30 @@ fun ThresholdScreen(state: UiState, vm: MiddlemanViewModel, onExamples: () -> Un
             Spacer(Modifier.height(12.dp))
             if (door == Door.START) {
                 Field(title, { title = it }, "What's it about? (only a title)", capitalization = KeyboardCapitalization.Sentences)
+                Spacer(Modifier.height(20.dp))
+                Text("DELETE IT ANYWAY AFTER", style = MaterialTheme.typography.labelSmall, color = Ink.Fog)
+                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    listOf(null to "NEVER", 1 to "1 DAY", 3 to "3", 7 to "7", 30 to "30").forEach { (days, label) ->
+                        Tab(label, expiry == days) { expiry = days }
+                    }
+                }
                 Spacer(Modifier.height(28.dp))
-                Solemn("BEGIN", enabled = name.isNotBlank() && !state.busy) { vm.create(title, name) }
+                Solemn("ASK FOR SPACE", enabled = name.isNotBlank() && !state.busy) { vm.create(title, name, expiry) }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "You'll get a code. Give it to everyone else in this. Each of you talks to me alone until it's safe to talk to each other.",
+                    "You'll get a link to send them. They can still reach you, but only through me, and only in words I'm willing to carry. When I judge it's over, it's deleted.",
                     style = MaterialTheme.typography.bodyMedium, color = Ink.Fog, textAlign = TextAlign.Center,
                 )
             } else {
-                Field(code, { code = it.uppercase().filter(Char::isLetterOrDigit).take(6) }, "Invite code", capitalization = KeyboardCapitalization.Characters)
+                Field(code, { code = it.trim() }, "Invite link or code", capitalization = KeyboardCapitalization.Characters)
                 Spacer(Modifier.height(28.dp))
-                Solemn("ENTER", enabled = name.isNotBlank() && code.length == 6 && !state.busy) { vm.join(code, name) }
+                val parsed = inviteCodeFrom(code)
+                Solemn("ENTER", enabled = name.isNotBlank() && parsed != null && !state.busy) { vm.join(parsed!!, name) }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Someone asked for space. You can still talk to them, through me. Say anything; I'll pass on what matters.",
+                    style = MaterialTheme.typography.bodyMedium, color = Ink.Fog, textAlign = TextAlign.Center,
+                )
             }
 
             Spacer(Modifier.height(48.dp))

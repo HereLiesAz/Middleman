@@ -30,6 +30,8 @@ import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
 import org.slf4j.LoggerFactory
 import java.io.File
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -46,6 +48,9 @@ import kotlin.time.Duration.Companion.seconds
  * | `CLAUDE_MODEL`      | `claude-opus-5-5`  |                                                 |
  * | `CLAUDE_EFFORT`     | `medium`           | `low`, `medium`, `high`, `xhigh`, `max`         |
  * | `CORS_ORIGINS`      | `*`                | comma-separated origins allowed for the web app |
+ * | `PUBLIC_URL`        | `https://middleman.hereliesaz.com` | base of shareable invite links      |
+ * | `WEB_ROOT`          |                    | directory of the built web app to serve           |
+ * | `ANDROID_CERT_SHA256` |                  | comma-separated signing-cert fingerprints for App Links |
  */
 fun main() {
     val env = System.getenv()
@@ -54,8 +59,16 @@ fun main() {
     val store = SqliteSessionStore(dbPath)
     val mediator = mediatorFrom(env)
     LoggerFactory.getLogger("Middleman").info("Mediator: ${mediator.name}. Store: $dbPath")
+    val service = MediationService(store, mediator, env["PUBLIC_URL"] ?: "https://middleman.hereliesaz.com")
     embeddedServer(Netty, port = env["PORT"]?.toInt() ?: 8080) {
-        middleman(store, MediationService(store, mediator), env["CORS_ORIGINS"])
+        middleman(
+            store, service,
+            corsOrigins = env["CORS_ORIGINS"],
+            webRoot = env["WEB_ROOT"]?.let(::File)?.takeIf { it.isDirectory },
+            androidCertSha256 = env["ANDROID_CERT_SHA256"]?.split(',')?.map(String::trim)?.filter(String::isNotEmpty).orEmpty(),
+        )
+        // Expiry is a promise to delete; keep it even when nobody is looking.
+        launch { while (true) { runCatching { service.sweepExpired() }; delay(60_000) } }
     }.start(wait = true)
 }
 
@@ -78,7 +91,13 @@ fun mediatorFrom(env: Map<String, String>): Mediator {
     return FallbackMediator(LlmMediator(llm))
 }
 
-fun Application.middleman(store: SessionStore, service: MediationService, corsOrigins: String? = null) {
+fun Application.middleman(
+    store: SessionStore,
+    service: MediationService,
+    corsOrigins: String? = null,
+    webRoot: File? = null,
+    androidCertSha256: List<String> = emptyList(),
+) {
     install(ContentNegotiation) { json(MiddlemanJson) }
     install(WebSockets) { pingPeriod = 20.seconds }
     install(CallLogging)
@@ -96,5 +115,8 @@ fun Application.middleman(store: SessionStore, service: MediationService, corsOr
             call.respond(status, body)
         }
     }
-    routing { middlemanRoutes(service, store) }
+    routing {
+        middlemanRoutes(service, store)
+        webRoutes(webRoot, androidCertSha256)
+    }
 }

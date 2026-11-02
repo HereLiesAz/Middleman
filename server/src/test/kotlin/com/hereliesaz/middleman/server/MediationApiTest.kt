@@ -1,8 +1,10 @@
 package com.hereliesaz.middleman.server
 
+import com.hereliesaz.middleman.api.CreateSessionRequest
 import com.hereliesaz.middleman.api.Credentials
 import com.hereliesaz.middleman.api.MiddlemanJson
 import com.hereliesaz.middleman.api.Routes
+import com.hereliesaz.middleman.model.EndReason
 import com.hereliesaz.middleman.model.SessionView
 import com.hereliesaz.middleman.server.mediation.HeuristicMediator
 import com.hereliesaz.middleman.server.store.SqliteSessionStore
@@ -14,6 +16,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -21,18 +24,27 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import java.io.File
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MediationApiTest {
+    private var now = 1_000_000L
+    private lateinit var service: MediationService
+
     private fun withServer(block: suspend ApplicationTestBuilder.(HttpClient) -> Unit) = testApplication {
         val db = File.createTempFile("middleman", ".db").apply { deleteOnExit() }
         val store = SqliteSessionStore(db.path)
-        application { middleman(store, MediationService(store, HeuristicMediator)) }
+        service = MediationService(store, HeuristicMediator, "https://middleman.test", clock = { now })
+        application { middleman(store, service, androidCertSha256 = listOf("AA:BB")) }
         block(createClient { install(ContentNegotiation) { json(MiddlemanJson) } })
     }
+
+    private fun device() = UUID.randomUUID().toString()
 
     private suspend fun HttpClient.json(path: String, body: Any, token: String? = null): HttpResponse = post(path) {
         token?.let { bearerAuth(it) }
@@ -40,97 +52,101 @@ class MediationApiTest {
         setBody(body)
     }
 
-    private suspend fun HttpClient.create(name: String) =
-        json(Routes.SESSIONS, mapOf("title" to "Dishes", "name" to name)).body<Credentials>()
+    private suspend fun HttpClient.create(name: String, dev: String = device(), expiryDays: Int? = null) =
+        json(Routes.SESSIONS, CreateSessionRequest("Dishes", name, dev, expiryDays)).body<Credentials>()
 
-    private suspend fun HttpClient.join(code: String, name: String) =
-        json(Routes.JOIN, mapOf("inviteCode" to code, "name" to name)).body<Credentials>()
+    private suspend fun HttpClient.join(code: String, name: String, dev: String = device()) =
+        json(Routes.JOIN, mapOf("inviteCode" to code, "name" to name, "deviceId" to dev)).body<Credentials>()
 
     private suspend fun HttpClient.me(token: String) = get(Routes.ME) { bearerAuth(token) }.body<SessionView>()
 
     private suspend fun HttpClient.say(token: String, text: String) =
-        json(Routes.PRIVATE, mapOf("text" to text), token).body<SessionView>()
+        json(Routes.SAY, mapOf("text" to text), token).body<SessionView>()
 
-    /** Enough honest private conversation, across two themes each, to open the joint room. */
-    private suspend fun HttpClient.hearOut(a: String, b: String) {
-        say(a, "I feel alone with the chores around the house.")
-        say(b, "Work has me terrified and I come home late.")
-        say(a, "When I talk, it feels like you ignore me.")
-        say(b, "Your family visits drain me before I've rested.")
-        say(a, "I just want to feel like a team with the dishes.")
-        say(b, "I'm late because I'm scared of losing the job.")
+    private suspend fun HttpClient.pair(): Pair<Credentials, Credentials> {
+        val a = create("Alex")
+        return a to join(me(a.token).inviteCode, "Jordan")
     }
 
-    @Test fun privateWordsNeverCrossRooms() = withServer { c ->
-        val alex = c.create("Alex")
-        val code = c.me(alex.token).inviteCode
-        val jordan = c.join(code, "Jordan")
-
-        c.say(alex.token, "Jordan never helps with the dishes and I'm exhausted.")
-        val jordanView = c.me(jordan.token)
-
-        assertEquals(listOf("Alex", "Jordan"), jordanView.participants.map { it.name })
-        assertTrue(jordanView.privateRoom.isEmpty())
-        assertTrue(jordanView.jointRoom.isEmpty())
-        assertTrue(jordanView.yourNeeds.isEmpty())
-        val leaked = MiddlemanJson.encodeToString(SessionView.serializer(), jordanView)
-        assertFalse("exhausted" in leaked, "Alex's private words reached Jordan")
+    @Test fun privateWordsStayPrivate() = withServer { c ->
+        val (a, b) = c.pair()
+        c.say(a.token, "I'm exhausted and nobody helps with the dishes.")
+        val jordan = c.me(b.token)
+        assertTrue(jordan.room.isEmpty())
+        assertFalse("exhausted" in MiddlemanJson.encodeToString(SessionView.serializer(), jordan))
+        assertEquals("https://middleman.test/j/${jordan.inviteCode}", jordan.link)
     }
 
-    @Test fun jointRoomLockedUntilEveryoneHeard() = withServer { c ->
-        val a = c.create("Alex")
-        val b = c.join(c.me(a.token).inviteCode, "Jordan")
-        assertEquals(HttpStatusCode.Conflict, c.json(Routes.JOINT, mapOf("text" to "hi"), a.token).status)
+    @Test fun relaysAreParaphrasedNotForwarded() = withServer { c ->
+        val (a, b) = c.pair()
+        val mine = c.say(a.token, "Tell Jordan he never helps with the chores and I'm sick of it.").room.first { it.authorId == a.participantId }
+        val delivered = assertNotNull(mine.deliveredAs)
 
-        c.hearOut(a.token, b.token)
-        val view = c.me(a.token)
-        assertTrue(view.jointUnlocked, view.readiness.toString())
-
-        // A third person arrives: the room closes until they've been heard too.
-        c.join(view.inviteCode, "Sam")
-        assertFalse(c.me(a.token).jointUnlocked)
+        val relay = c.me(b.token).room.single()
+        assertEquals(a.participantId, relay.relayFrom)
+        assertEquals(delivered, relay.text)
+        assertFalse("sick of it" in relay.text)
+        assertFalse("never" in relay.text.lowercase())
     }
 
-    @Test fun cruelMessagesAreHeldFromOthers() = withServer { c ->
-        val a = c.create("Alex")
-        val b = c.join(c.me(a.token).inviteCode, "Jordan")
-        c.hearOut(a.token, b.token)
-
-        val mine = c.json(Routes.JOINT, mapOf("text" to "You're a selfish idiot."), a.token).body<SessionView>()
-        assertTrue(mine.jointRoom.any { it.held && it.text.contains("selfish") })
-        assertTrue(c.me(b.token).jointRoom.none { "selfish" in it.text })
-
-        c.json(Routes.JOINT, mapOf("text" to "I felt invisible on Friday."), a.token)
-        assertTrue(c.me(b.token).jointRoom.any { it.text == "I felt invisible on Friday." })
+    @Test fun pureAbuseIsWithheld() = withServer { c ->
+        val (a, b) = c.pair()
+        val mine = c.say(a.token, "Tell Jordan he's a worthless idiot.").room.first { it.authorId == a.participantId }
+        assertNull(mine.deliveredAs)
+        assertNotNull(mine.withheld)
+        assertTrue(c.me(b.token).room.isEmpty())
     }
 
-    @Test fun bridgeDeliversOnlyWithConsent() = withServer { c ->
-        val a = c.create("Alex")
-        val b = c.join(c.me(a.token).inviteCode, "Jordan")
-        val view = c.say(a.token, "I always do the chores and it's crushing me.")
-        assertTrue(c.me(b.token).privateRoom.isEmpty())
+    @Test fun resolutionDeletesEverything() = withServer { c ->
+        val (a, b) = c.pair()
+        c.say(a.token, "I feel alone with the chores.")
+        c.say(b.token, "Work has me scared.")
+        c.say(a.token, "Thank you for understanding. I'm okay now.")
+        val last = c.say(b.token, "I understand now. We're good.")
 
-        val reply = view.privateRoom.last { it.authorId == null }
-        c.json(Routes.BRIDGE, mapOf("messageId" to reply.id), a.token)
-        c.json(Routes.BRIDGE, mapOf("messageId" to reply.id), a.token) // idempotent
-
-        val delivered = c.me(b.token).privateRoom
-        assertEquals(1, delivered.size)
-        assertEquals(a.participantId, delivered.single().onBehalfOf)
-        assertFalse("crushing" in delivered.single().text)
+        assertEquals(EndReason.RESOLVED, last.ending?.reason)
+        assertEquals(HttpStatusCode.Unauthorized, c.get(Routes.ME) { bearerAuth(a.token) }.status)
+        assertEquals(HttpStatusCode.NotFound, c.json(Routes.JOIN, mapOf("inviteCode" to last.inviteCode, "name" to "X", "deviceId" to device())).status)
     }
 
-    @Test fun tokensAreRequiredAndScoped() = withServer { c ->
+    @Test fun oneSettledPersonIsNotResolution() = withServer { c ->
+        val (a, b) = c.pair()
+        c.say(a.token, "I feel alone with the chores.")
+        c.say(b.token, "You're selfish and I'm still furious.")
+        c.say(a.token, "I'm okay now.")
+        assertNull(c.say(b.token, "No. Still angry about work.").ending)
+    }
+
+    @Test fun newMediationBetweenSamePeopleReplacesOld() = withServer { c ->
+        val alexPhone = device(); val jordanPhone = device(); val samPhone = device()
+        val old = c.create("Alex", alexPhone)
+        c.join(c.me(old.token).inviteCode, "Jordan", jordanPhone)
+        val unrelated = c.create("Sam", samPhone)
+
+        val fresh = c.create("Alex", alexPhone)
+        c.join(c.me(fresh.token).inviteCode, "Jordan", jordanPhone)
+
+        assertEquals(HttpStatusCode.Unauthorized, c.get(Routes.ME) { bearerAuth(old.token) }.status)
+        assertEquals(HttpStatusCode.OK, c.get(Routes.ME) { bearerAuth(fresh.token) }.status)
+        assertEquals(HttpStatusCode.OK, c.get(Routes.ME) { bearerAuth(unrelated.token) }.status)
+    }
+
+    @Test fun expiryDeletes() = withServer { c ->
+        val a = c.create("Alex", expiryDays = 1)
+        assertNotNull(c.me(a.token).expiresAt)
+        now += MediationService.DAY_MS + 1
+        service.sweepExpired()
+        assertEquals(HttpStatusCode.Unauthorized, c.get(Routes.ME) { bearerAuth(a.token) }.status)
+        assertEquals(HttpStatusCode.BadRequest, c.json(Routes.SESSIONS, CreateSessionRequest("t", "n", device(), 2)).status)
+    }
+
+    @Test fun tokensAreRequired() = withServer { c ->
         assertEquals(HttpStatusCode.Unauthorized, c.get(Routes.ME).status)
         assertEquals(HttpStatusCode.Unauthorized, c.get(Routes.ME) { bearerAuth("forged") }.status)
-        assertEquals(HttpStatusCode.NotFound, c.json(Routes.JOIN, mapOf("inviteCode" to "NOPE00", "name" to "X")).status)
     }
 
-    @Test fun timeoutBlocksJointRoom() = withServer { c ->
-        val a = c.create("Alex")
-        val b = c.join(c.me(a.token).inviteCode, "Jordan")
-        c.hearOut(a.token, b.token)
-        c.json(Routes.TIMEOUT, emptyMap<String, String>(), b.token)
-        assertEquals(HttpStatusCode.Conflict, c.json(Routes.JOINT, mapOf("text" to "but"), a.token).status)
+    @Test fun appLinksAreDeclared() = withServer { c ->
+        val body = c.get("/.well-known/assetlinks.json").bodyAsText()
+        assertTrue("com.hereliesaz.middleman" in body && "AA:BB" in body, body)
     }
 }

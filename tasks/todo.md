@@ -40,7 +40,7 @@ Bugs caught by verification:
 
 ---
 
-# v2: Middleman is the timeout (relay model). PLAN, awaiting confirmation
+# v2: Middleman is the timeout (relay model)
 
 ## Model
 - Starting a session is a softer kind of block: "talk to me through Middleman until you can be respectful."
@@ -60,7 +60,8 @@ Bugs caught by verification:
 - **On resolution or expiry the session is deleted**, along with its messages and tokens. Clients get a final closing note
   over the stream, then the session ceases to exist on the server.
 - **Supersede:** a stable anonymous device identity (random id, stored on the device) links people across sessions.
-  When someone joins a new session, any older live session containing both them and this session's starter is deleted.
+  When someone joins a new session, any older live session containing both them and this session's starter is deleted,
+  group sessions included. Confirmed.
 
 ## Removed
 - Joint room, readiness score and meter, clean-fight *holding* (the rules now feed the paraphrase/censor), timeouts and breathing.
@@ -75,3 +76,20 @@ Bugs caught by verification:
 - Then a texter doesn't need the app at all. Texts from someone in an active mediation go to Middleman instead of the inbox,
   and Middleman's paraphrase goes back out as SMS from the starter's own number.
 - Google Play allows SMS permissions only for apps that really are the default SMS handler. Declaration form required.
+
+## v2 status
+- [x] shared: relay model (`room`, `relayFrom`, `deliveredAs`, `withheld`, `Ending`), invite-link parsing; readiness removed
+- [x] server: relay, withholding, per-person "settled" judgment, resolution, expiry sweeper, replacement by device pair,
+      cascading deletion with secure_delete, `/j/<code>` web route, `assetlinks.json`
+- [x] mediators: heuristic and LLM prompt rewritten for relaying, withholding and settledness
+- [x] UI: single room, invite link copy, expiry picker, "what they heard", ended screen; joint room and timeouts removed
+- [x] Android App Links for `https://middleman.hereliesaz.com/j/*`; web reads its own path
+- [ ] Set `ANDROID_CERT_SHA256` on the server once the Play signing key exists, or App Links won't verify
+- [ ] SMS phase (default SMS app)
+
+## v2 review
+- `:shared:jvmTest` 7/7, `:server:test` 14/14, including the shipped client streaming a mediation to its RESOLVED frame.
+- Android debug and release builds pass; web compiles.
+- Desktop screenshot against a live server: relay labels, "not passed on", and the header copy render correctly. The withheld
+  reason was shown twice, so the duplicate under the message was cut to a label.
+- "Settled" state is held in memory and resets on server restart, so judgment has to be earned again. That's deliberate.

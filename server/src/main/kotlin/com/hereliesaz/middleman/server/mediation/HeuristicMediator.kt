@@ -1,6 +1,5 @@
 package com.hereliesaz.middleman.server.mediation
 
-import com.hereliesaz.middleman.model.CleanFightRule
 import com.hereliesaz.middleman.model.ContentVsFeelings
 import com.hereliesaz.middleman.model.Insight
 import com.hereliesaz.middleman.model.IntentSandwich
@@ -21,6 +20,7 @@ object HeuristicMediator : Mediator {
         val ground: (String, String) -> String,
         val layers: ContentVsFeelings,
         val truth: String,
+        /** A paraphrase safe to carry to the others, in the speaker's voice. */
         val bridge: String,
     )
 
@@ -73,18 +73,37 @@ object HeuristicMediator : Mediator {
         bridge = "I want us to understand each other clearly so we can get through this without hurting each other.",
     )
 
+    private val relayAsk = Regex("\\b(tell|let|ask|remind) (him|her|them|everyone|\\w+) (that|know|to|i)\\b|\\bpass (it|this|that) on\\b", RegexOption.IGNORE_CASE)
+    private val settledWords = Regex(
+        "\\b(i'?m (ok|okay|good|fine) now|we'?re (ok|okay|good)|i forgive|apology accepted|i'?m ready to talk|thank you for understanding|i understand now|resolved)\\b",
+        RegexOption.IGNORE_CASE,
+    )
+
     override suspend fun counsel(ctx: PrivateContext): Counsel {
         val lower = ctx.text.lowercase()
         // Most trigger hits wins; one stray word ("house") shouldn't decide what the fight is about.
-        val t = themes.map { th -> th to th.triggers.count { it in lower } }.filter { it.second > 0 }.maxByOrNull { it.second }?.first
-            ?: fallbackTheme
+        val matched = themes.map { th -> th to th.triggers.count { it in lower } }.filter { it.second > 0 }.maxByOrNull { it.second }?.first
+        val t = matched ?: fallbackTheme
         val s = ctx.speaker.name
         val o = ctx.others.map { it.name }.joinedNaturally().ifEmpty { "the others" }
         val alerts = CleanFight.check(ctx.text)
+        val settled = settledWords.containsMatchIn(ctx.text) && alerts.none { it.holds }
+
+        val wantsRelay = relayAsk.containsMatchIn(ctx.text) || ctx.others.any { it.name.isNotBlank() && it.name.lowercase() in lower }
+        val onlyAbuse = matched == null && alerts.any { it.holds }
+        val relay = when {
+            ctx.others.isEmpty() || !wantsRelay || onlyAbuse -> null
+            settled -> "$s says they're in a better place about this, and ready to talk."
+            else -> "$s wants you to know: \"${t.bridge}\""
+        }
+        val withheld = if (wantsRelay && onlyAbuse && ctx.others.isNotEmpty())
+            "There was nothing in that I could carry to $o without it doing harm. Tell me what you need from them, and I'll take that."
+        else null
 
         val validation = "I hear how heavy this is, $s. It makes sense that it hurts."
         val misread = "When something hurts, the mind fills the gap with the worst explanation. What looks like indifference from $o is often pressure, fear, or exhaustion wearing a mask."
-        val question = "If $o understood one thing about what this has been like for you, what would you want it to be?"
+        val question = if (settled) "Is there anything you still need from $o before this is behind you?"
+        else "If $o understood one thing about what this has been like for you, what would you want it to be?"
         val insight = Insight(
             validation = validation,
             misinterpretation = misread,
@@ -98,27 +117,23 @@ object HeuristicMediator : Mediator {
                 reassurance = "…because I want us on the same side again.",
             ),
             clarifyingQuestion = question,
-            bridge = t.bridge,
         )
         val coaching = alerts.joinToString(" ") { it.note }.let { if (it.isEmpty()) "" else "\n\n$it" }
+        val relayLine = when {
+            relay != null -> "\n\nI'll tell $o, in my words."
+            withheld != null -> "\n\n$withheld"
+            else -> ""
+        }
         return Counsel(
-            reply = "$validation\n\n$misread$coaching\n\n$question",
+            reply = "$validation\n\n$misread$coaching$relayLine\n\n$question",
             insight = insight,
-            needs = listOf(t.need),
-            commonGround = listOf(t.ground(s, o).substringAfter("both ").replaceFirstChar { it.uppercase() }),
+            needs = matched?.let { listOf(it.need) }.orEmpty(),
+            commonGround = matched?.let { listOf(it.ground(s, o).substringAfter("both ").replaceFirstChar { c -> c.uppercase() }) }.orEmpty(),
             perspective = "$s needs ${t.need.lowercase()}.",
+            relay = relay,
+            withheld = withheld,
+            settled = settled,
+            closingNote = "Everyone seems to have been heard. This mediation is over, and everything said in it is being deleted. Talk to each other directly now. Gently.",
         )
-    }
-
-    override suspend fun facilitate(ctx: JointContext): String? {
-        if (ctx.alerts.isEmpty()) return null
-        val trigger = CleanFight.firstTrigger(ctx.text) ?: return null
-        val o = ctx.others.map { it.name }.joinedNaturally()
-        return "Pause. $o, when you hear \"$trigger\", the reflex is to defend yourself. Listen underneath it: ${ctx.speaker.name} is telling you something hurts. ${ctx.speaker.name}, what's the one moment you most want understood?"
-    }
-
-    override suspend fun reframe(ctx: JointContext): String {
-        val notes = ctx.alerts.filter(CleanFightRule::holds).joinToString(" ") { it.note }
-        return "I held that one back. Nobody else saw it. $notes\n\nWhat's the hurt underneath it? Try saying that instead: what happened, how it felt, what you need."
     }
 }

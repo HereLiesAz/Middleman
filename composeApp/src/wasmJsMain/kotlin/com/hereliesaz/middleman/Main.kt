@@ -2,6 +2,7 @@ package com.hereliesaz.middleman
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
+import com.hereliesaz.middleman.api.inviteCodeFrom
 import com.hereliesaz.middleman.ui.App
 import kotlinx.browser.document
 import kotlinx.browser.localStorage
@@ -18,5 +19,6 @@ private object LocalStore : KeyValueStore {
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     val origin = window.location.origin.takeIf { it.startsWith("http") && !it.contains(":8081") } ?: "http://localhost:8080"
-    ComposeViewport(document.body!!) { App(LocalStore, origin) }
+    val invite = inviteCodeFrom(window.location.pathname)
+    ComposeViewport(document.body!!) { App(LocalStore, origin, invite) }
 }
