@@ -1,6 +1,0 @@
-{
-  "name": "Middleman - AI Couple Conflict Mediator",
-  "description": "An AI mediator for couples in conflict. Messages are sent privately to the AI, which uses rhetorical contrastruction and compassionate inquiry to bridge perspectives before uniting both partners in direct dialogue.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

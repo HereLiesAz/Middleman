@@ -1,8 +1,26 @@
-node_modules/
+# Gradle / Kotlin
+.gradle/
+.kotlin/
 build/
-dist/
-coverage/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# IDE
+.idea/
+*.iml
 .DS_Store
-*.log
+
+# Xcode
+iosApp/*.xcodeproj/xcuserdata/
+iosApp/*.xcworkspace/xcuserdata/
+iosApp/build/
+
+# Secrets & runtime data
 .env*
 !.env.example
+*.jks
+*.keystore
+keystore.properties
+server/data/
+*.db
+*.log
