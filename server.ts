@@ -7,13 +7,16 @@ import { GoogleGenAI, Type } from '@google/genai';
 import {
   calculateReadiness,
   contrastructStatement,
-  detectHighFriction
+  detectHighFriction,
+  HYPOTHETICAL_CONTRASTRUCTION_EXAMPLES
 } from './src/utils/mediationRules.js';
 import {
   MediationSession,
   Message,
   PartnerId,
-  ChatType
+  ChatType,
+  UserProfile,
+  UserInteractionRecord
 } from './src/types/mediation.js';
 
 dotenv.config();
@@ -49,7 +52,7 @@ function withTimeout<T>(promise: Promise<T>, ms = 6000): Promise<T> {
 }
 
 /**
- * Pre-configured realistic conflict scenarios
+ * Pre-configured realistic conflict scenarios with rich UserProfiles
  */
 const DEFAULT_SCENARIOS = [
   {
@@ -57,22 +60,32 @@ const DEFAULT_SCENARIOS = [
     title: 'The Forgotten Anniversary & Overwork',
     description: 'Alex feels heartbroken and deprioritized after Jordan worked late on their 5th anniversary. Jordan is terrified of upcoming layoffs and worked late trying to protect their family finances.',
     partnerA: {
-      id: 'partner_a' as PartnerId,
+      userId: 'usr_alex_882',
+      partnerId: 'partner_a' as PartnerId,
       name: 'Alex',
       roleDescription: 'Feeling neglected, unappreciated, and emotionally abandoned on an important milestone.',
       avatarSeed: 'alex',
+      relationshipLength: '5 years married',
+      perspectiveSummary: 'Alex feels that emotional presence and sacred milestone rituals are the true measure of commitment. When work interferes with personal time, Alex experiences it as feeling invisible and replaceable.',
+      communicationTendencies: ['Expressive and emotionally direct', 'Seeks immediate verbal reassurance', 'Vulnerable to feeling dismissed'],
+      identifiedTriggers: ['Broken milestone promises', 'Dismissive body language', 'Unilateral schedule shifts'],
+      underlyingNeeds: ['Reassurance of priority', 'Dedicated romantic connection', 'Feeling treasured'],
       readinessScore: 15,
-      perceivedGrievances: ['Worked late on anniversary', 'Always puts job before relationship', 'Does not apologize sincerely'],
-      underlyingNeeds: ['Reassurance of priority', 'Dedicated romantic connection', 'Feeling treasured']
+      interactionHistory: []
     },
     partnerB: {
-      id: 'partner_b' as PartnerId,
+      userId: 'usr_jordan_914',
+      partnerId: 'partner_b' as PartnerId,
       name: 'Jordan',
       roleDescription: 'Carrying intense anxiety over impending company layoffs and feeling misunderstood and unappreciated for working so hard.',
       avatarSeed: 'jordan',
+      relationshipLength: '5 years married',
+      perspectiveSummary: 'Jordan measures love and devotion through duty, financial protection, and safeguarding the couple’s future. In moments of crisis, Jordan retreats into problem-solving and work.',
+      communicationTendencies: ['Task-oriented and analytical', 'Avoidant when feeling criticized', 'Needs calm space before opening up'],
+      identifiedTriggers: ['Being accused of not caring', 'Sudden emotional confrontations', 'Perceived lack of appreciation for hard work'],
+      underlyingNeeds: ['Grace and empathy under high pressure', 'Relief from financial anxiety', 'Emotional partnership instead of blame'],
       readinessScore: 15,
-      perceivedGrievances: ['Constant guilt trips', 'Unrealistic expectations when career is on the line', 'Efforts to provide go unnoticed'],
-      underlyingNeeds: ['Grace and empathy under high pressure', 'Relief from financial anxiety', 'Emotional partnership instead of blame']
+      interactionHistory: []
     },
     initialMessageA: "Jordan completely blew off our 5th anniversary dinner to stay late at the office! They act like their job is the only thing that matters, and when I cried about it, they just rolled their eyes and said 'I'm trying to provide for us'. It feels like I'm completely invisible.",
     initialMessageB: "Alex is acting like I deliberately tried to hurt them. My company announced a 30% workforce reduction yesterday, and my team was in crisis mode until 9 PM. If I lose this job, we lose our apartment. I don't get why they can't see the pressure I'm under!"
@@ -82,22 +95,32 @@ const DEFAULT_SCENARIOS = [
     title: 'Chores & The Invisible Mental Load',
     description: 'Morgan is exhausted from carrying all household planning, groceries, and cleaning. Sam feels constantly nitpicked, criticized, and that nothing they do is ever right.',
     partnerA: {
-      id: 'partner_a' as PartnerId,
+      userId: 'usr_morgan_341',
+      partnerId: 'partner_a' as PartnerId,
       name: 'Morgan',
       roleDescription: 'Burnt out by being the household manager and default chore-doer.',
       avatarSeed: 'morgan',
+      relationshipLength: '4 years living together',
+      perspectiveSummary: 'Morgan perceives domestic chaos as sensory overload and a sign of isolation in daily partnership. Craves proactive teamwork where duties do not need to be assigned.',
+      communicationTendencies: ['Exhaustion-driven venting', 'Desires proactive initiative', 'Frustrated by having to ask repeatedly'],
+      identifiedTriggers: ['Passive delays', 'Half-finished chores', 'Being called a nag'],
+      underlyingNeeds: ['True domestic partnership', 'Relief from carrying mental load alone', 'Feeling respected'],
       readinessScore: 20,
-      perceivedGrievances: ['Default housekeeper', 'Has to ask repeatedly for basic help', 'Mess left everywhere'],
-      underlyingNeeds: ['True domestic partnership', 'Relief from carrying mental load alone', 'Feeling respected']
+      interactionHistory: []
     },
     partnerB: {
-      id: 'partner_b' as PartnerId,
+      userId: 'usr_sam_512',
+      partnerId: 'partner_b' as PartnerId,
       name: 'Sam',
       roleDescription: 'Feeling defensive, walk-on-eggshells, and that their contributions are ignored.',
       avatarSeed: 'sam',
+      relationshipLength: '4 years living together',
+      perspectiveSummary: 'Sam feels that whatever effort is given goes unnoticed or criticized for not matching Morgan’s exact standard. Retreats into hesitation to avoid failure.',
+      communicationTendencies: ['Defensive withdrawal', 'Craves positive reinforcement', 'Sensitive to perceived disapproval'],
+      identifiedTriggers: ['Immediate criticism upon entering the room', 'Micromanagement', 'Comparison to ideals'],
+      underlyingNeeds: ['Appreciation for genuine attempts', 'Clear collaborative agreement without contempt', 'Emotional warmth'],
       readinessScore: 20,
-      perceivedGrievances: ['Never does anything right according to Morgan', 'Treated like an incompetent child', 'Immediate hostility when walking through the door'],
-      underlyingNeeds: ['Appreciation for genuine attempts', 'Clear collaborative agreement without contempt', 'Emotional warmth']
+      interactionHistory: []
     },
     initialMessageA: "I am sick and tired of having to ask 4 times just for the dishes to be put in the dishwasher. I work full time too, but somehow I'm also expected to be the cook, maid, and scheduler. I'm drowning.",
     initialMessageB: "I literally spent two hours fixing the gutters and doing the laundry on Saturday, and Morgan didn't even notice. All she did was snap at me because the folded towels weren't stacked how she likes. I feel like I can never win."
@@ -107,22 +130,32 @@ const DEFAULT_SCENARIOS = [
     title: 'Holiday Travel & In-Law Boundaries',
     description: 'Riley wants a peaceful holiday at home after a brutal year; Taylor made promises to parents for an extensive multi-state family marathon.',
     partnerA: {
-      id: 'partner_a' as PartnerId,
+      userId: 'usr_riley_620',
+      partnerId: 'partner_a' as PartnerId,
       name: 'Riley',
       roleDescription: 'Needs rest, decompression, and healthy boundaries with demanding extended family.',
       avatarSeed: 'riley',
+      relationshipLength: '6 years together',
+      perspectiveSummary: 'Riley experiences prolonged family visits as overwhelming and emotionally draining, needing home as a restorative sanctuary for mental health.',
+      communicationTendencies: ['Clear boundary seeking', 'Values quiet decompression', 'Needs autonomy in schedule'],
+      identifiedTriggers: ['Decisions made without consultation', 'Over-scheduling', 'Guilt-tripping'],
+      underlyingNeeds: ['Autonomy in holiday planning', 'Rest and nervous system safety', 'Being prioritized as nuclear family'],
       readinessScore: 25,
-      perceivedGrievances: ['Decisions made without consultation', 'Exhausting family obligations', 'Needs are secondary to in-laws'],
-      underlyingNeeds: ['Autonomy in holiday planning', 'Rest and nervous system safety', 'Being prioritized as nuclear family']
+      interactionHistory: []
     },
     partnerB: {
-      id: 'partner_b' as PartnerId,
+      userId: 'usr_taylor_739',
+      partnerId: 'partner_b' as PartnerId,
       name: 'Taylor',
       roleDescription: 'Struggling with family guilt, aging parents, and tradition.',
       avatarSeed: 'taylor',
+      relationshipLength: '6 years together',
+      perspectiveSummary: 'Taylor is deeply conscious of parents aging and feels an urgent desire to preserve holiday rituals and family continuity while time allows.',
+      communicationTendencies: ['Relational peacemaker', 'Torn between partner and family', 'Prone to taking on guilt'],
+      identifiedTriggers: ['Partner dismissing family importance', 'Feeling torn in two directions', 'Fear of future regret'],
+      underlyingNeeds: ['Family continuity and connection', 'Support from partner in front of parents', 'Harmony'],
       readinessScore: 25,
-      perceivedGrievances: ['Partner refuses to engage with family', 'Guilt from aging parents', 'Feelings caught in the middle'],
-      underlyingNeeds: ['Family continuity and connection', 'Support from partner in front of parents', 'Harmony']
+      interactionHistory: []
     },
     initialMessageA: "Taylor told their mother we would spend the entire Thanksgiving week at their house without even talking to me first. I've had panic attacks all month from work and just desperately need 3 quiet days to recover.",
     initialMessageB: "My parents are getting older and my dad's health is declining. This might be one of our last Thanksgivings all together. Riley acting like my family is a prison sentence makes me feel isolated and resentful."
@@ -140,15 +173,15 @@ function createInitialSession(scenarioId = 'anniversary_overwork'): MediationSes
     id: 'session-' + Date.now(),
     scenarioTitle: template.title,
     scenarioDescription: template.description,
-    partnerA: { ...template.partnerA },
-    partnerB: { ...template.partnerB },
+    partnerA: { ...template.partnerA, interactionHistory: [] },
+    partnerB: { ...template.partnerB, interactionHistory: [] },
     privateMessagesA: [
       {
         id: 'msg-init-a',
         sender: 'ai_middleman',
         recipient: 'partner_a',
         chatType: 'private_a',
-        text: `Hello ${template.partnerA.name}. I'm Middleman. I am here as your neutral, confidential mediator. Messages here are strictly between you and me. I will listen to your perspective with compassion, ask clarifying questions, and help bridge the gap with ${template.partnerB.name} using contrastruction—finding the agreeable, deeply human needs beneath the frustration. When you're ready, tell me what happened from your point of view.`,
+        text: `Hello ${template.partnerA.name}. I'm Middleman. I am here as your confidential, private mediator. Everything you share here is strictly protected—${template.partnerB.name} cannot see your private room. I will listen to your perspective with compassion, ask clarifying questions, and help bridge the gap using contrastruction without causing emotional injury. When you're ready, tell me what happened from your point of view.`,
         timestamp: now - 30000
       }
     ],
@@ -158,7 +191,7 @@ function createInitialSession(scenarioId = 'anniversary_overwork'): MediationSes
         sender: 'ai_middleman',
         recipient: 'partner_b',
         chatType: 'private_b',
-        text: `Hello ${template.partnerB.name}. I'm Middleman. I'm talking to both you and ${template.partnerA.name} in separate, private rooms. You can speak freely and honestly to me. My role is to help you feel heard, discover what's truly at stake, and help bridge misunderstandings without shoving blame into anyone's face. How are you holding up, and what is your side of things?`,
+        text: `Hello ${template.partnerB.name}. I'm Middleman. I'm talking to both you and ${template.partnerA.name} in separate, private rooms. Your raw messages stay strictly between you and me to protect both of you from emotional injuries. My role is to help you feel heard, discover what's truly at stake, and bridge misunderstandings neutrally. How are you holding up, and what is your side of things?`,
         timestamp: now - 25000
       }
     ],
@@ -170,7 +203,7 @@ function createInitialSession(scenarioId = 'anniversary_overwork'): MediationSes
       sharedGoalsIdentified: 15,
       score: 20,
       readyForDirectChat: false,
-      summary: 'Mediation begun. Separate chats are active to understand both perspectives.'
+      summary: 'Mediation begun. Separate chats are active to protect partners from direct emotional injuries.'
     },
     bridgeNotes: {
       partnerACoreNeeds: [],
@@ -193,14 +226,88 @@ function createInitialSession(scenarioId = 'anniversary_overwork'): MediationSes
 
 let activeSession = createInitialSession('anniversary_overwork');
 
-// API: Get current session
+/**
+ * Filter session to STRICTLY protect each partner's private chat.
+ * A partner must NEVER see the other partner's raw private chat!
+ */
+function sanitizeSessionForUser(session: MediationSession, viewingUserId?: string): MediationSession {
+  // Determine if viewing as partner A or partner B
+  const isPartnerA = !viewingUserId || viewingUserId === session.partnerA.userId;
+  const isPartnerB = viewingUserId === session.partnerB.userId;
+
+  return {
+    ...session,
+    // Strictly shield private messages of the opposite partner!
+    privateMessagesA: isPartnerA ? session.privateMessagesA : [],
+    privateMessagesB: isPartnerB ? session.privateMessagesB : [],
+    // Joint messages only visible if unlocked
+    jointMessages: session.jointRoomUnlocked ? session.jointMessages : []
+  };
+}
+
+// API: Get current session (privacy filtered by userId)
 app.get('/api/mediation/session', (req: Request, res: Response) => {
-  res.json(activeSession);
+  const userId = req.query.userId as string | undefined;
+  const sanitized = sanitizeSessionForUser(activeSession, userId);
+  res.json(sanitized);
 });
 
 // API: List scenarios
 app.get('/api/mediation/scenarios', (req: Request, res: Response) => {
   res.json(DEFAULT_SCENARIOS);
+});
+
+// API: Get user profiles with interaction histories
+app.get('/api/mediation/profiles', (req: Request, res: Response) => {
+  res.json({
+    partnerA: activeSession.partnerA,
+    partnerB: activeSession.partnerB
+  });
+});
+
+// API: Get hypothetical contrastruction examples
+app.get('/api/mediation/contrastruction-examples', (req: Request, res: Response) => {
+  res.json(HYPOTHETICAL_CONTRASTRUCTION_EXAMPLES);
+});
+
+// API: Analyze and contrastruct arbitrary statement in real time
+app.post('/api/mediation/contrastruct-analyze', (req: Request, res: Response) => {
+  const { text, speakerName, listenerName } = req.body;
+  if (!text || typeof text !== 'string') {
+    res.status(400).json({ error: 'Text string is required' });
+    return;
+  }
+  const insight = contrastructStatement(
+    text,
+    speakerName || activeSession.partnerA.name,
+    listenerName || activeSession.partnerB.name
+  );
+  res.json(insight);
+});
+
+// API: Update user profile
+app.put('/api/mediation/profile/:userId', (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const { name, roleDescription, relationshipLength, perspectiveSummary } = req.body;
+
+  const target = activeSession.partnerA.userId === userId
+    ? activeSession.partnerA
+    : activeSession.partnerB.userId === userId
+    ? activeSession.partnerB
+    : null;
+
+  if (!target) {
+    res.status(404).json({ error: 'Profile not found' });
+    return;
+  }
+
+  if (name) target.name = name.trim();
+  if (roleDescription) target.roleDescription = roleDescription.trim();
+  if (relationshipLength) target.relationshipLength = relationshipLength.trim();
+  if (perspectiveSummary) target.perspectiveSummary = perspectiveSummary.trim();
+
+  activeSession.lastUpdated = Date.now();
+  res.json(target);
 });
 
 // API: Reset session with scenario
@@ -212,22 +319,32 @@ app.post('/api/mediation/reset', (req: Request, res: Response) => {
       scenarioTitle: customTopic || 'Custom Disagreement',
       scenarioDescription: 'Mediation session between ' + customPartnerA + ' and ' + customPartnerB,
       partnerA: {
-        id: 'partner_a',
+        userId: 'usr_' + customPartnerA.toLowerCase().replace(/\s+/g, '_') + '_' + (Date.now() % 1000),
+        partnerId: 'partner_a',
         name: customPartnerA,
         roleDescription: 'Partner A in conflict',
         avatarSeed: 'partner_a',
+        relationshipLength: 'Couples relationship',
+        perspectiveSummary: `${customPartnerA} is sharing their honest perspective on ${customTopic || 'the current disagreement'}.`,
+        communicationTendencies: ['Direct expression of needs', 'Seeking clarity'],
+        identifiedTriggers: ['Feeling unheard'],
+        underlyingNeeds: [],
         readinessScore: 20,
-        perceivedGrievances: [],
-        underlyingNeeds: []
+        interactionHistory: []
       },
       partnerB: {
-        id: 'partner_b',
+        userId: 'usr_' + customPartnerB.toLowerCase().replace(/\s+/g, '_') + '_' + ((Date.now() + 1) % 1000),
+        partnerId: 'partner_b',
         name: customPartnerB,
         roleDescription: 'Partner B in conflict',
         avatarSeed: 'partner_b',
+        relationshipLength: 'Couples relationship',
+        perspectiveSummary: `${customPartnerB} is sharing their honest perspective on ${customTopic || 'the current disagreement'}.`,
+        communicationTendencies: ['Protecting against defensiveness', 'Seeking understanding'],
+        identifiedTriggers: ['Criticism and assumptions'],
+        underlyingNeeds: [],
         readinessScore: 20,
-        perceivedGrievances: [],
-        underlyingNeeds: []
+        interactionHistory: []
       },
       privateMessagesA: [
         {
@@ -235,7 +352,7 @@ app.post('/api/mediation/reset', (req: Request, res: Response) => {
           sender: 'ai_middleman',
           recipient: 'partner_a',
           chatType: 'private_a',
-          text: `Hello ${customPartnerA}. I am Middleman, your private conflict mediator. Everything you say here stays between us until we find the right, constructive way to bridge it to ${customPartnerB}. What is on your mind?`,
+          text: `Hello ${customPartnerA}. I am Middleman, your private conflict mediator. Everything you say here stays between us—${customPartnerB} cannot see this room. I will listen to your perspective with compassion, ask clarifying questions, and help bridge the gap using contrastruction without causing emotional injury. What is on your mind?`,
           timestamp: Date.now()
         }
       ],
@@ -245,7 +362,7 @@ app.post('/api/mediation/reset', (req: Request, res: Response) => {
           sender: 'ai_middleman',
           recipient: 'partner_b',
           chatType: 'private_b',
-          text: `Hello ${customPartnerB}. I am Middleman. I am listening to both you and ${customPartnerA} in separate private rooms so you can speak without fear of being attacked. Tell me how you are feeling about the situation.`,
+          text: `Hello ${customPartnerB}. I am Middleman. I am listening to both you and ${customPartnerA} in separate private rooms so you can speak without fear of being attacked or injured. Tell me how you are feeling about the situation.`,
           timestamp: Date.now()
         }
       ],
@@ -271,7 +388,7 @@ app.post('/api/mediation/reset', (req: Request, res: Response) => {
   } else {
     activeSession = createInitialSession(scenarioId);
   }
-  res.json(activeSession);
+  res.json(sanitizeSessionForUser(activeSession));
 });
 
 /**
@@ -279,7 +396,7 @@ app.post('/api/mediation/reset', (req: Request, res: Response) => {
  */
 app.post('/api/mediation/private-message', async (req: Request, res: Response) => {
   try {
-    const { partnerId, text } = req.body;
+    const { partnerId, text, userId } = req.body;
     if (!partnerId || !text || !text.trim()) {
       res.status(400).json({ error: 'partnerId and text are required' });
       return;
@@ -301,22 +418,54 @@ app.post('/api/mediation/private-message', async (req: Request, res: Response) =
     };
     activeSession[chatKey].push(userMsg);
 
-    // Call Gemini to generate Middleman response with contrastruction
+    // Baseline fallback contrastruction
+    const baseInsight = contrastructStatement(text, speaker.name, otherPartner.name);
+
     let aiResponseContent = {
+      validationSummary: `I hear how intensely frustrating and lonely this situation feels for you, ${speaker.name}. Carrying this without feeling acknowledged takes a heavy emotional toll.`,
+      misinterpretationSpotlight: `When actions feel hurtful, it is completely natural for our minds to assume ${otherPartner.name} simply doesn't care. However, external pressure or fear often masquerades as indifference.`,
+      contrastAndCommonGround: {
+        areaOfContrast: baseInsight.areaOfContrast || `${speaker.name} and ${otherPartner.name} are viewing the issue through different emotional filters.`,
+        constructedCommonGround: baseInsight.constructedCommonGround || `Both partners want to feel valued and peaceful in their home.`
+      },
       middlemanReply: '',
-      clarifyingQuestion: '',
-      contrastruction: contrastructStatement(text, speaker.name, otherPartner.name),
+      clarifyingQuestion: `When this happened, what was the biggest thing you needed ${otherPartner.name} to understand about what you were going through?`,
+      contrastruction: baseInsight,
+      contentVsFeelings: baseInsight.contentVsFeelings,
+      intentSandwich: baseInsight.intentSandwich,
+      cleanFightAlerts: baseInsight.cleanFightAlerts || [],
       bridgedMessageForPartner: null as string | null,
-      identifiedCoreNeeds: [] as string[],
-      identifiedCommonGround: [] as string[]
+      updatedPerspectiveSummary: `${speaker.name} is seeking acknowledgement and reassurance that their needs matter in the partnership.`,
+      identifiedCoreNeeds: [baseInsight.underlyingNeed],
+      identifiedCommonGround: ['Both value feeling respected and connected at home']
     };
 
     if (aiClient) {
       try {
+        const pastSpeakerInteractions = speaker.interactionHistory
+          .slice(-3)
+          .map((h) => `[Interaction] Said: "${h.speakerText}" -> Need: ${h.clarifiedNeed || 'unspecified'}`)
+          .join('\n') || 'None recorded yet';
+
         const prompt = `
-You are "Middleman", an expert couples mediator and thoughtful neutral negotiator.
+You are "Middleman", an exceptionally compassionate, thoughtful, and neutral couples mediator and negotiator.
 You are in a private 1-on-1 mediation session with ${speaker.name}.
-The other partner is ${otherPartner.name}.
+
+USER PROFILES & INTERACTION HISTORY:
+- SPEAKER:
+  * User ID: ${speaker.userId}
+  * Name: ${speaker.name}
+  * Current Perspective Summary: ${speaker.perspectiveSummary}
+  * Communication Tendencies: ${speaker.communicationTendencies.join(', ')}
+  * Identified Triggers: ${speaker.identifiedTriggers.join(', ')}
+  * Recent Interaction History with Middleman:
+${pastSpeakerInteractions}
+
+- OTHER PARTNER:
+  * User ID: ${otherPartner.userId}
+  * Name: ${otherPartner.name}
+  * Current Perspective Summary: ${otherPartner.perspectiveSummary}
+  * Core Needs Discovered: ${otherPartner.underlyingNeeds.join(', ') || 'Still being uncovered'}
 
 SCENARIO CONTEXT:
 ${activeSession.scenarioTitle}: ${activeSession.scenarioDescription}
@@ -324,33 +473,64 @@ ${activeSession.scenarioTitle}: ${activeSession.scenarioDescription}
 SPEAKER (${speaker.name}) JUST SAID:
 "${text}"
 
-RECENT PRIVATE CONVERSATION WITH ${speaker.name}:
+RECENT PRIVATE MESSAGES IN THIS SESSION:
 ${activeSession[chatKey].slice(-4).map((m) => `${m.sender}: ${m.text}`).join('\n')}
 
-WHAT THE OTHER PARTNER (${otherPartner.name}) HAS SHARED SO FAR:
+WHAT ${otherPartner.name} HAS SHARED PRIVATELY (Do not betray secrets; use this to build mutual understanding):
 ${activeSession[otherChatKey].filter((m) => m.sender !== 'ai_middleman').slice(-3).map((m) => `${otherPartner.name}: ${m.text}`).join('\n') || 'None yet'}
 
-RHETORICAL CONTRASTRUCTION METHOD (from Jeff Smith-Luedke's "You're Stupid / The Neo-Machiavellian"):
-- Contrastruction takes an argument or complaint and makes it agreeable WITHOUT altering the speaker's actual words, but by shifting the sense or context of the ambiguous parts.
-- Words are ambiguous; behind anger, resentment, and blame lie unreasoned, seminal core human values and needs (e.g., craving partnership, feeling abandoned, longing for safety, feeling overwhelmed, wanting reassurance).
-- Adopt a tone of genuine, gentle curiosity and compassion (never headstrong, judgmental, or shoving misinterpretation in their face).
-- Ask a thoughtful clarifying question to explore the ambiguous, vulnerable context beneath their words.
-- Formulate a bridged proposal: how Middleman can speak FOR ${speaker.name} to ${otherPartner.name} in an agreeable, compassionate way that ${otherPartner.name} can receive without becoming defensive.
-- Determine if any newly identified core needs or common ground have emerged.
+MANDATORY RHETORICAL CONTRASTRUCTION & ZE FRANK CLEAN FIGHT PROTOCOL:
+1. ZE FRANK TWO-LAYER DECOUPLING (CONTENT VS. FEELINGS):
+   - Decouple the CONTENT ARGUMENT (logistical facts, chores, dinner, who forgot what) from the FEELINGS ARGUMENT (feeling rejected, abandoned, inadequate, invisible).
+   - Address and validate the Feelings Argument first before ever debating the Content Argument.
+2. CLEAN FIGHT SAFEGUARDS:
+   - Identify if the speaker used totalizing words ("always", "never") or relationship threats ("maybe we should break up"). Soften and reframe without accusation.
+3. VALIDATION & SUMMARIZATION FIRST:
+   - Before offering neutral commentary or probing questions, summarize ${speaker.name}'s message with profound empathy so they feel 100% heard, validated, and never rushed.
+4. NON-ACCUSATORY MISINTERPRETATION SPOTLIGHT:
+   - Identify potential misinterpretations without being accusatory or dismissive. Gently illuminate the gap between what was felt/assumed vs. alternative explanations or intentions.
+5. CONTRASTRUCTION: HIGHLIGHT CONTRAST & CONSTRUCT COMMON GROUND:
+   - Highlight the area of contrast: explain the differing subjective lenses of ${speaker.name} and ${otherPartner.name}.
+   - Construct common ground: bridge both partners to their shared underlying human value (love, security, teamwork, respect).
+   - Recontextualize ${speaker.name}'s exact words into an agreeable, vulnerable sense wholly consistent with their original statement.
+6. THE INTENT SANDWICH (ZE FRANK TECHNIQUE):
+   - Formulate bridged communication sandwiched in safety:
+     * Anchor of Care: "I love you and value our relationship..."
+     * Vulnerable Core Need: "...which is why it hurts when..."
+     * Reassurance of Commitment: "...because I want us to be a close team."
+7. GENTLE CLARIFYING INQUIRY:
+   - Ask a thoughtful, curious clarifying question that bridges the perspective gap.
 
 Respond with strict JSON matching this schema:
 {
-  "middlemanReply": "Compassionate, deeply empathetic response to ${speaker.name} validating their experience without taking sides or judging.",
-  "clarifyingQuestion": "A curious, gentle clarifying question that unearths the deeper ambiguity or need (e.g., 'When you felt X, what did you wish they knew in that exact moment?')",
+  "validationSummary": "Compassionate, deeply validating summary of ${speaker.name}'s feelings ensuring they feel heard first",
+  "misinterpretationSpotlight": "Non-accusatory observation highlighting how actions or words could be misinterpreted vs likely underlying pressures",
+  "contrastAndCommonGround": {
+    "areaOfContrast": "Contrast between ${speaker.name}'s lens and ${otherPartner.name}'s lens",
+    "constructedCommonGround": "The shared human value or goal uniting both partners"
+  },
+  "contentVsFeelings": {
+    "contentLayer": "The logistical fact/chore/dispute layer",
+    "feelingsLayer": "The vulnerable emotional reaction layer underneath"
+  },
+  "intentSandwich": {
+    "anchorOfCare": "Declaration of overarching care and value of the relationship",
+    "vulnerableTruth": "The vulnerable unstated pain or fear",
+    "reassuranceOfCommitment": "Reassurance that the goal is partnership and closeness"
+  },
+  "cleanFightAlerts": ["Any gentle reflections on always/never generalizations or relationship threats"],
+  "middlemanReply": "The complete, thoughtful, comforting conversational response to ${speaker.name}",
+  "clarifyingQuestion": "A curious, gentle clarifying question to explore ambiguous context",
   "contrastruction": {
-    "originalQuote": "The exact phrase or sentence from the speaker",
+    "originalQuote": "The exact quote from speaker",
     "ambiguousPart": "The ambiguous phrasing where interpretations clashed",
     "underlyingNeed": "The unstated vulnerable core human value/need",
     "agreeableSense": "The recontextualization in an agreeable, compassionate sense consistent with their words",
     "bridgeProposal": "How Middleman would lovingly phrase this need to ${otherPartner.name}",
     "toneRecommendation": "Gentle guidance for how to hold this feeling"
   },
-  "bridgedMessageForPartner": "A message Middleman can deliver into ${otherPartner.name}'s private chat to gently introduce ${speaker.name}'s side without accusation, OR null if not ready yet",
+  "bridgedMessageForPartner": "An Intent Sandwich message Middleman can deliver into ${otherPartner.name}'s private chat speaking for ${speaker.name} without accusation, OR null if not ready yet",
+  "updatedPerspectiveSummary": "Updated 1-2 sentence perspective summary of ${speaker.name} based on this interaction",
   "identifiedCoreNeeds": ["1 or 2 concise bullet points of ${speaker.name}'s core values/needs"],
   "identifiedCommonGround": ["Any shared values or hopes both partners share"]
 }
@@ -360,73 +540,121 @@ Respond with strict JSON matching this schema:
           aiClient.models.generateContent({
             model: 'gemini-3.8-flash',
             contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                middlemanReply: { type: Type.STRING },
-                clarifyingQuestion: { type: Type.STRING },
-                contrastruction: {
-                  type: Type.OBJECT,
-                  properties: {
-                    originalQuote: { type: Type.STRING },
-                    ambiguousPart: { type: Type.STRING },
-                    underlyingNeed: { type: Type.STRING },
-                    agreeableSense: { type: Type.STRING },
-                    bridgeProposal: { type: Type.STRING },
-                    toneRecommendation: { type: Type.STRING }
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  validationSummary: { type: Type.STRING },
+                  misinterpretationSpotlight: { type: Type.STRING },
+                  contrastAndCommonGround: {
+                    type: Type.OBJECT,
+                    properties: {
+                      areaOfContrast: { type: Type.STRING },
+                      constructedCommonGround: { type: Type.STRING }
+                    },
+                    required: ['areaOfContrast', 'constructedCommonGround']
                   },
-                  required: ['originalQuote', 'ambiguousPart', 'underlyingNeed', 'agreeableSense']
+                  contentVsFeelings: {
+                    type: Type.OBJECT,
+                    properties: {
+                      contentLayer: { type: Type.STRING },
+                      feelingsLayer: { type: Type.STRING }
+                    },
+                    required: ['contentLayer', 'feelingsLayer']
+                  },
+                  intentSandwich: {
+                    type: Type.OBJECT,
+                    properties: {
+                      anchorOfCare: { type: Type.STRING },
+                      vulnerableTruth: { type: Type.STRING },
+                      reassuranceOfCommitment: { type: Type.STRING }
+                    },
+                    required: ['anchorOfCare', 'vulnerableTruth', 'reassuranceOfCommitment']
+                  },
+                  cleanFightAlerts: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                  },
+                  middlemanReply: { type: Type.STRING },
+                  clarifyingQuestion: { type: Type.STRING },
+                  contrastruction: {
+                    type: Type.OBJECT,
+                    properties: {
+                      originalQuote: { type: Type.STRING },
+                      ambiguousPart: { type: Type.STRING },
+                      underlyingNeed: { type: Type.STRING },
+                      agreeableSense: { type: Type.STRING },
+                      bridgeProposal: { type: Type.STRING },
+                      toneRecommendation: { type: Type.STRING }
+                    },
+                    required: ['originalQuote', 'ambiguousPart', 'underlyingNeed', 'agreeableSense']
+                  },
+                  bridgedMessageForPartner: { type: Type.STRING, nullable: true },
+                  updatedPerspectiveSummary: { type: Type.STRING },
+                  identifiedCoreNeeds: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                  },
+                  identifiedCommonGround: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                  }
                 },
-                bridgedMessageForPartner: { type: Type.STRING, nullable: true },
-                identifiedCoreNeeds: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING }
-                },
-                identifiedCommonGround: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING }
-                }
-              },
-              required: ['middlemanReply', 'clarifyingQuestion', 'contrastruction']
+                required: [
+                  'validationSummary',
+                  'misinterpretationSpotlight',
+                  'contrastAndCommonGround',
+                  'middlemanReply',
+                  'clarifyingQuestion',
+                  'contrastruction'
+                ]
+              }
             }
-          }
-        }), 6000);
+          }),
+          6000
+        );
 
         const parsed = JSON.parse(response.text || '{}');
         aiResponseContent = {
           ...aiResponseContent,
-          ...parsed
+          ...parsed,
+          contentVsFeelings: parsed.contentVsFeelings || baseInsight.contentVsFeelings,
+          intentSandwich: parsed.intentSandwich || baseInsight.intentSandwich,
+          cleanFightAlerts: parsed.cleanFightAlerts || baseInsight.cleanFightAlerts || [],
+          contrastruction: {
+            ...baseInsight,
+            ...(parsed.contrastruction || {}),
+            areaOfContrast: parsed.contrastAndCommonGround?.areaOfContrast || baseInsight.areaOfContrast,
+            constructedCommonGround: parsed.contrastAndCommonGround?.constructedCommonGround || baseInsight.constructedCommonGround,
+            contentVsFeelings: parsed.contentVsFeelings || baseInsight.contentVsFeelings,
+            intentSandwich: parsed.intentSandwich || baseInsight.intentSandwich,
+            cleanFightAlerts: parsed.cleanFightAlerts || baseInsight.cleanFightAlerts
+          }
         };
       } catch (err) {
         console.warn('Gemini call failed or timed out, using intelligent heuristic contrastruction fallback', err);
-        // Fallback uses deterministic contrastructStatement
-        const fallbackInsight = contrastructStatement(text, speaker.name, otherPartner.name);
-        aiResponseContent = {
-          middlemanReply: `I hear you loud and clear, ${speaker.name}. It makes complete sense why that would feel so frustrating and exhausting. You're carrying a lot right now, and wanting to feel valued by ${otherPartner.name} is completely understandable.`,
-          clarifyingQuestion: `Could you tell me a little more about what you were hoping ${otherPartner.name} would notice or say in that moment?`,
-          contrastruction: fallbackInsight,
-          bridgedMessageForPartner: `${speaker.name} shared that underneath the immediate frustration, they are feeling overwhelmed and deeply want to feel like you two are a coordinated team.`,
-          identifiedCoreNeeds: [fallbackInsight.underlyingNeed],
-          identifiedCommonGround: ['Both value mutual consideration and want to be appreciated']
-        };
+        aiResponseContent.middlemanReply = `${aiResponseContent.validationSummary}\n\n${aiResponseContent.misinterpretationSpotlight}`;
       }
-    } else {
-      // Deterministic heuristic mode when no API key configured
-      const fallbackInsight = contrastructStatement(text, speaker.name, otherPartner.name);
-      aiResponseContent = {
-        middlemanReply: `I hear how much weight you are carrying, ${speaker.name}. Feeling unheard in these moments makes everything heavier. Thank you for being candid with me.`,
-        clarifyingQuestion: `When this happened, what was the biggest unmet need you felt in that moment?`,
-        contrastruction: fallbackInsight,
-        bridgedMessageForPartner: `${speaker.name} opened up about feeling depleted and wanting more reciprocal teamwork between you two.`,
-        identifiedCoreNeeds: [fallbackInsight.underlyingNeed],
-        identifiedCommonGround: ['Desire for peace and mutual understanding']
-      };
     }
 
-    // Combine middleman reply with clarifying question for natural reading
-    const fullMiddlemanText = `${aiResponseContent.middlemanReply}\n\n${aiResponseContent.clarifyingQuestion}`;
+    // Save interaction record to speaker's UserProfile history
+    speaker.interactionHistory.push({
+      timestamp: Date.now(),
+      speakerText: text.trim(),
+      middlemanValidation: aiResponseContent.validationSummary,
+      identifiedPerspective: aiResponseContent.contrastruction.agreeableSense,
+      clarifiedNeed: aiResponseContent.contrastruction.underlyingNeed
+    });
+
+    if (aiResponseContent.updatedPerspectiveSummary) {
+      speaker.perspectiveSummary = aiResponseContent.updatedPerspectiveSummary;
+    }
+
+    // Compose Middleman's full message
+    const fullMiddlemanText = aiResponseContent.middlemanReply.includes(aiResponseContent.clarifyingQuestion)
+      ? aiResponseContent.middlemanReply
+      : `${aiResponseContent.middlemanReply}\n\n${aiResponseContent.clarifyingQuestion}`;
 
     // Add Middleman message to this partner's chat
     const aiMsg: Message = {
@@ -436,7 +664,12 @@ Respond with strict JSON matching this schema:
       chatType: partnerId === 'partner_a' ? 'private_a' : 'private_b',
       text: fullMiddlemanText,
       timestamp: Date.now() + 1,
+      validationSummary: aiResponseContent.validationSummary,
+      misinterpretationSpotlight: aiResponseContent.misinterpretationSpotlight,
       contrastructionInsight: aiResponseContent.contrastruction,
+      contentVsFeelings: aiResponseContent.contentVsFeelings,
+      intentSandwich: aiResponseContent.intentSandwich,
+      cleanFightAlerts: aiResponseContent.cleanFightAlerts,
       isClarifyingQuestion: true
     };
     activeSession[chatKey].push(aiMsg);
@@ -450,13 +683,13 @@ Respond with strict JSON matching this schema:
     }
 
     // Check if Middleman should deliver a bridged message into other partner's feed
-    // (Playing the middleman - speaking FOR each side!)
+    // (Playing the middleman - speaking FOR each side without inflammatory words!)
     if (aiResponseContent.bridgedMessageForPartner && aiResponseContent.bridgedMessageForPartner.trim()) {
       const bridgeMsg: Message = {
         id: 'msg-bridge-' + (Date.now() + 2),
         sender: 'ai_middleman',
-        recipient: otherPartner.id,
-        chatType: otherPartner.id === 'partner_a' ? 'private_a' : 'private_b',
+        recipient: otherPartner.partnerId,
+        chatType: otherPartner.partnerId === 'partner_a' ? 'private_a' : 'private_b',
         text: `🕊️ **Perspective Bridge from Middleman:**\n${speaker.name} shared something meaningful with me. Looking past the immediate heat of the moment, here is what they are really experiencing:\n\n*"${aiResponseContent.bridgedMessageForPartner}"*\n\nThey aren't trying to attack you—they're longing to feel connected and supported by you. How does hearing that land for you?`,
         timestamp: Date.now() + 2,
         deliveredToPartner: true
@@ -514,7 +747,9 @@ Respond with strict JSON matching this schema:
     }
 
     activeSession.lastUpdated = Date.now();
-    res.json(activeSession);
+    // Return sanitized session for viewing partner
+    const currentViewerId = userId || speaker.userId;
+    res.json(sanitizeSessionForUser(activeSession, currentViewerId));
   } catch (error) {
     console.error('Error in private-message:', error);
     res.status(500).json({ error: 'Failed to process message' });
@@ -607,6 +842,46 @@ GUIDELINES FOR MIDDLEMAN IN JOINT ROOM:
     console.error('Error in joint-message:', error);
     res.status(500).json({ error: 'Failed to process joint message' });
   }
+});
+
+/**
+ * Handle Ze Frank Structured Timeout request
+ */
+app.post('/api/mediation/timeout', (req: Request, res: Response) => {
+  const { partnerId, userId, chatType } = req.body;
+  const speaker = partnerId === 'partner_a' ? activeSession.partnerA : activeSession.partnerB;
+  const otherPartner = partnerId === 'partner_a' ? activeSession.partnerB : activeSession.partnerA;
+
+  const timeoutMessageText = `⏸️ **Ze Frank Clean Fight Timeout Called:**\n${speaker.name} has called for a brief timeout. This is one of the highest-leverage skills in conflict resolution: recognizing when emotional flooding prevents true listening.\n\nTake 60 seconds to breathe slowly (4 seconds in, 4 seconds hold, 4 seconds out). When your heart rate settles, you can return to the conversation not as adversaries fighting over the facts, but as teammates solving an emotional disconnect together.`;
+
+  if (chatType === 'joint') {
+    const jointTimeoutMsg: Message = {
+      id: 'msg-timeout-' + Date.now(),
+      sender: 'ai_middleman',
+      recipient: 'both',
+      chatType: 'joint',
+      text: timeoutMessageText,
+      timestamp: Date.now(),
+      isIntervention: true
+    };
+    activeSession.jointMessages.push(jointTimeoutMsg);
+  } else {
+    const privateKey = partnerId === 'partner_a' ? 'privateMessagesA' : 'privateMessagesB';
+    const privateTimeoutMsg: Message = {
+      id: 'msg-timeout-' + Date.now(),
+      sender: 'ai_middleman',
+      recipient: partnerId,
+      chatType: partnerId === 'partner_a' ? 'private_a' : 'private_b',
+      text: timeoutMessageText,
+      timestamp: Date.now(),
+      isIntervention: true
+    };
+    activeSession[privateKey].push(privateTimeoutMsg);
+  }
+
+  activeSession.lastUpdated = Date.now();
+  const currentViewerId = userId || speaker.userId;
+  res.json(sanitizeSessionForUser(activeSession, currentViewerId));
 });
 
 // Start Server & Vite Integration

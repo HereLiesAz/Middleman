@@ -1,25 +1,31 @@
 import React from 'react';
 import {
-  HeartHandshake,
   Scale,
   BookOpen,
-  FolderGit2,
-  Columns,
   User,
   Users,
   Lock,
-  Sparkles,
-  BarChart3
+  ArrowRightLeft,
+  Timer,
+  FolderGit2,
+  FileText,
+  Columns,
+  Sparkles
 } from 'lucide-react';
-import { MediationSession, PartnerId } from '../types/mediation';
+import { MediationSession, PartnerId, UserProfile } from '../types/mediation';
+
+export type ViewMode = 'split' | 'private_a' | 'private_b' | 'joint';
 
 interface HeaderProps {
   session: MediationSession;
-  activeView: 'partner_a' | 'partner_b' | 'split' | 'joint';
-  onSelectView: (view: 'partner_a' | 'partner_b' | 'split' | 'joint') => void;
+  activeView: ViewMode;
+  onSelectView: (view: ViewMode) => void;
   onOpenScenarios: () => void;
-  onOpenContrastructionInfo: () => void;
+  onOpenContrastructionLab: () => void;
   onOpenBridgeNotes: () => void;
+  onOpenUserProfile: () => void;
+  onOpenZeFrankPlaybook: () => void;
+  onOpenTimeoutModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,149 +33,166 @@ export const Header: React.FC<HeaderProps> = ({
   activeView,
   onSelectView,
   onOpenScenarios,
-  onOpenContrastructionInfo,
-  onOpenBridgeNotes
+  onOpenContrastructionLab,
+  onOpenBridgeNotes,
+  onOpenUserProfile,
+  onOpenZeFrankPlaybook,
+  onOpenTimeoutModal
 }) => {
   const { readiness, jointRoomUnlocked, partnerA, partnerB } = session;
 
   return (
-    <header className="bg-stone-900 border-b border-stone-800 text-stone-100 sticky top-0 z-30 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo & Tagline */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-sm ring-1 ring-emerald-400/30">
-              <Scale className="w-5 h-5 text-white" />
+    <header className="bg-[#181716] border-b border-[#2a2825] text-[#e8e4dc] sticky top-0 z-30 transition-colors">
+      <div className="max-w-[1720px] mx-auto px-3 sm:px-6">
+        <div className="flex items-center justify-between h-16 gap-2">
+          {/* Brand Identity */}
+          <div className="flex items-center space-x-3 shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-[#242220] border border-[#38342f] flex items-center justify-center text-[#d4975c]">
+              <Scale className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-lg tracking-tight text-stone-100">
+              <div className="flex items-baseline gap-2">
+                <span className="font-editorial text-xl font-medium tracking-normal text-[#f4efe6]">
                   Middleman
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-medium">
-                  AI Conflict Mediator
+                <span className="text-[10px] text-[#9c958a] tracking-wider uppercase font-mono hidden md:inline">
+                  AI Conflict Mediator & Rhetorical Transducer
                 </span>
               </div>
-              <p className="text-xs text-stone-400 hidden sm:block">
-                Bridging couples through rhetorical contrastruction & compassionate inquiry
-              </p>
             </div>
           </div>
 
-          {/* Center Navigation Tabs */}
-          <nav className="flex items-center bg-stone-950/70 p-1 rounded-xl border border-stone-800 overflow-x-auto max-w-[65%] sm:max-w-none scrollbar-none">
-            {/* Partner A Tab */}
-            <button
-              onClick={() => onSelectView('partner_a')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium rounded-lg transition-colors shrink-0 ${
-                activeView === 'partner_a'
-                  ? 'bg-emerald-700/80 text-emerald-100 shadow-sm'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/50'
-              }`}
-              title={`Private session for ${partnerA.name}`}
-            >
-              <User className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>{partnerA.name}</span>
-              <span className="hidden sm:inline text-[10px] px-1 rounded bg-stone-800 text-stone-300">
-                Private
-              </span>
-            </button>
-
-            {/* Partner B Tab */}
-            <button
-              onClick={() => onSelectView('partner_b')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium rounded-lg transition-colors shrink-0 ${
-                activeView === 'partner_b'
-                  ? 'bg-amber-700/80 text-amber-100 shadow-sm'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/50'
-              }`}
-              title={`Private session for ${partnerB.name}`}
-            >
-              <User className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>{partnerB.name}</span>
-              <span className="hidden sm:inline text-[10px] px-1 rounded bg-stone-800 text-stone-300">
-                Private
-              </span>
-            </button>
-
-            {/* Split View Tab (Desktop/Tablet) */}
+          {/* Master View Mode Switcher: Spatial Dual Theatre vs Focused Solo vs Joint */}
+          <nav className="flex items-center bg-[#131211] p-1 rounded-lg border border-[#2a2825] overflow-x-auto scrollbar-none">
+            {/* Dual Horizon Theatre Tab */}
             <button
               onClick={() => onSelectView('split')}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all shrink-0 ${
                 activeView === 'split'
-                  ? 'bg-stone-700 text-stone-100 shadow-sm'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/50'
+                  ? 'bg-[#262421] text-[#f4efe6] shadow-xs border border-[#3a352e]'
+                  : 'text-[#8f887d] hover:text-[#e8e4dc]'
               }`}
-              title="Split View (Watch both sides simultaneously)"
+              title="Dual-Chamber Horizon: Both chambers + Middleman bridge visible simultaneously"
             >
-              <Columns className="w-3.5 h-3.5 text-stone-300" />
-              <span>Dual View</span>
+              <Columns className="w-3.5 h-3.5 text-[#d4975c]" />
+              <span>Dual Horizon</span>
+              <span className="hidden lg:inline text-[9px] text-[#716a5f] font-mono">[Master]</span>
+            </button>
+
+            {/* Partner A Private Room */}
+            <button
+              onClick={() => onSelectView('private_a')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all shrink-0 ${
+                activeView === 'private_a'
+                  ? 'bg-[#262421] text-[#f4efe6] shadow-xs border border-[#3a352e]'
+                  : 'text-[#8f887d] hover:text-[#e8e4dc]'
+              }`}
+              title={`Confidential chamber for ${partnerA.name}`}
+            >
+              <User className="w-3.5 h-3.5 text-[#d4975c]" />
+              <span>{partnerA.name}'s Room</span>
+            </button>
+
+            {/* Partner B Private Room */}
+            <button
+              onClick={() => onSelectView('private_b')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all shrink-0 ${
+                activeView === 'private_b'
+                  ? 'bg-[#262421] text-[#f4efe6] shadow-xs border border-[#3a352e]'
+                  : 'text-[#8f887d] hover:text-[#e8e4dc]'
+              }`}
+              title={`Confidential chamber for ${partnerB.name}`}
+            >
+              <User className="w-3.5 h-3.5 text-[#d4975c]" />
+              <span>{partnerB.name}'s Room</span>
             </button>
 
             {/* Joint Room Tab */}
             <button
               onClick={() => onSelectView('joint')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium rounded-lg transition-all shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all shrink-0 ${
                 activeView === 'joint'
-                  ? 'bg-teal-600 text-white shadow-sm ring-1 ring-teal-400/40'
+                  ? 'bg-[#262421] text-[#f4efe6] shadow-xs border border-[#3a352e]'
                   : jointRoomUnlocked
-                  ? 'text-teal-300 bg-teal-950/50 hover:bg-teal-900/60 ring-1 ring-teal-500/40'
-                  : 'text-stone-500 hover:text-stone-400'
+                  ? 'text-[#9bb098] hover:text-[#f4efe6]'
+                  : 'text-[#615b52] hover:text-[#8f887d]'
               }`}
               title={
                 jointRoomUnlocked
-                  ? 'Joint Room Unlocked: Direct conversation mediated by Middleman'
-                  : `Joint Room Locked (${readiness.score}% readiness reached)`
+                  ? 'Joint Room Unlocked: Facilitated direct dialogue'
+                  : `Joint Room Protected (${readiness.score}% readiness reached)`
               }
             >
               {jointRoomUnlocked ? (
-                <Users className="w-3.5 h-3.5 text-teal-300 shrink-0" />
+                <Users className="w-3.5 h-3.5 text-[#9bb098]" />
               ) : (
-                <Lock className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                <Lock className="w-3 h-3 text-[#615b52]" />
               )}
-              <span>Joint</span>
-              <span
-                className={`text-[10px] px-1 py-0.2 rounded font-mono ${
-                  jointRoomUnlocked
-                    ? 'bg-teal-400/20 text-teal-200'
-                    : 'bg-stone-800 text-stone-400'
-                }`}
-              >
-                {jointRoomUnlocked ? 'OPEN' : `${readiness.score}%`}
+              <span>Joint Sanctuary</span>
+              <span className="text-[10px] text-[#787166] font-mono">
+                {jointRoomUnlocked ? 'Open' : `${readiness.score}%`}
               </span>
             </button>
           </nav>
 
           {/* Right Action Tools */}
-          <div className="flex items-center gap-2">
-            {/* Scenarios Button */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Contrastruction Rhetoric Lab */}
             <button
-              onClick={onOpenScenarios}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-stone-800/80 text-stone-300 hover:bg-stone-700 hover:text-stone-100 transition-colors border border-stone-700"
-              title="Change conflict scenario or start fresh"
+              onClick={onOpenContrastructionLab}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-[#d4975c] bg-[#221d18] hover:bg-[#2b241d] border border-[#3f3123] rounded-md transition-colors"
+              title="Interactive Contrastruction Laboratory & Rhetoric Workbench"
             >
-              <FolderGit2 className="w-3.5 h-3.5 text-stone-400" />
-              <span className="hidden lg:inline">Scenarios</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline font-medium">Rhetoric Lab</span>
             </button>
 
-            {/* Contrastruction Info Button */}
+            {/* Clean Fight Playbook */}
             <button
-              onClick={onOpenContrastructionInfo}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-stone-800/80 text-stone-300 hover:bg-stone-700 hover:text-stone-100 transition-colors border border-stone-700"
-              title="What is Contrastruction?"
+              onClick={onOpenZeFrankPlaybook}
+              className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-[#b8b0a2] hover:text-[#f4efe6] hover:bg-[#23211f] rounded-md transition-colors"
+              title="Ze Frank's Clean Fight Principles"
             >
-              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden lg:inline">Contrastruction</span>
+              <BookOpen className="w-3.5 h-3.5 text-[#d4975c]" />
+              <span className="hidden lg:inline">Clean Fight</span>
             </button>
 
-            {/* Bridge Dossier / Readiness Drawer Toggle */}
+            {/* 60s Timeout */}
+            <button
+              onClick={onOpenTimeoutModal}
+              className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-[#b8b0a2] hover:text-[#f4efe6] hover:bg-[#23211f] rounded-md transition-colors"
+              title="Take a 60-second breathing timeout"
+            >
+              <Timer className="w-3.5 h-3.5 text-[#c96f53]" />
+              <span className="hidden lg:inline">Timeout</span>
+            </button>
+
+            {/* Middleman Dossier */}
             <button
               onClick={onOpenBridgeNotes}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-emerald-950/70 text-emerald-300 hover:bg-emerald-900/80 transition-colors border border-emerald-800/60"
-              title="Open Middleman's Bridge Notes & Readiness"
+              className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-[#b8b0a2] hover:text-[#f4efe6] hover:bg-[#23211f] rounded-md transition-colors"
+              title="Perspective tracking & negotiated ground"
             >
-              <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Bridge Notes</span>
+              <FileText className="w-3.5 h-3.5 text-[#9bb098]" />
+              <span className="hidden lg:inline">Dossier</span>
+            </button>
+
+            {/* Scenario Switcher */}
+            <button
+              onClick={onOpenScenarios}
+              className="p-1.5 text-[#8f887d] hover:text-[#e8e4dc] hover:bg-[#23211f] rounded-md transition-colors"
+              title="Change dispute scenario"
+            >
+              <FolderGit2 className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Profiles */}
+            <button
+              onClick={onOpenUserProfile}
+              className="p-1.5 text-[#8f887d] hover:text-[#e8e4dc] hover:bg-[#23211f] rounded-md transition-colors"
+              title="User profiles & interaction histories"
+            >
+              <User className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

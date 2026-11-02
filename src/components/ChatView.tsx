@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Message,
-  PartnerProfile,
+  UserProfile,
   PartnerId,
   ChatType
 } from '../types/mediation';
@@ -9,17 +9,15 @@ import { MessageItem } from './MessageItem';
 import {
   Send,
   Lock,
-  Sparkles,
   HeartHandshake,
-  ShieldCheck,
-  Flame,
-  ArrowRight,
-  MessageSquare
+  MessageSquare,
+  Sparkles,
+  ArrowUpRight
 } from 'lucide-react';
 
 interface ChatViewProps {
-  partnerA: PartnerProfile;
-  partnerB: PartnerProfile;
+  partnerA: UserProfile;
+  partnerB: UserProfile;
   messages: Message[];
   chatType: ChatType;
   currentPartnerId?: PartnerId; // for private rooms
@@ -42,6 +40,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [jointSender, setJointSender] = useState<PartnerId>('partner_a');
+  const [justSent, setJustSent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isJoint = chatType === 'joint';
@@ -58,11 +57,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (!inputText.trim() || isLoading) return;
     const text = inputText;
     setInputText('');
+    setJustSent(false);
     if (isJoint) {
       await onSendMessage(text, jointSender);
     } else {
       await onSendMessage(text, currentPartnerId);
     }
+    setJustSent(true);
+    setTimeout(() => setJustSent(false), 2000);
   };
 
   // Quick prompt suggestions based on partner perspective
@@ -88,63 +90,50 @@ export const ChatView: React.FC<ChatViewProps> = ({
       ];
 
   return (
-    <div className="flex flex-col h-full bg-stone-950 border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
-      {/* Sub-Header Banner */}
-      <div className="bg-stone-900/90 border-b border-stone-800 px-4 py-3 flex items-center justify-between">
+    <div className="flex flex-col h-full bg-[#181716] border border-[#2b2824] rounded-xl overflow-hidden shadow-sm">
+      {/* Room Sub-Header: Quiet, Serene Orientation */}
+      <div className="bg-[#1f1d1b] border-b border-[#2b2824] px-5 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {isJoint ? (
-            <div className="w-8 h-8 rounded-lg bg-teal-600/30 border border-teal-500/50 flex items-center justify-center text-teal-400">
-              <HeartHandshake className="w-4 h-4" />
-            </div>
-          ) : (
-            <div
-              className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                currentPartnerId === 'partner_a'
-                  ? 'bg-emerald-600/30 border border-emerald-500/50 text-emerald-300'
-                  : 'bg-amber-600/30 border border-amber-500/50 text-amber-300'
-              }`}
-            >
-              {currentPartner.name.charAt(0)}
-            </div>
-          )}
+          <div className="w-8 h-8 rounded-lg bg-[#2b2723] border border-[#3b3630] flex items-center justify-center text-[#d4975c]">
+            {isJoint ? (
+              <HeartHandshake className="w-4 h-4 text-[#9bb098]" />
+            ) : (
+              <span className="font-editorial text-sm font-semibold">
+                {currentPartner.name.charAt(0)}
+              </span>
+            )}
+          </div>
 
           <div>
-            <h2 className="text-sm font-semibold text-stone-100 flex items-center gap-2">
-              {isJoint ? (
-                <>
-                  <span>Joint Room: Direct Dialogue</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800">
-                    Facilitated by Middleman
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span>{currentPartner.name}'s Confidential Room</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-stone-800 text-stone-300 border border-stone-700 flex items-center gap-1">
-                    <Lock className="w-2.5 h-2.5" /> Private to AI
-                  </span>
-                </>
-              )}
-            </h2>
-            <p className="text-xs text-stone-400">
+            <div className="flex items-center gap-2">
+              <h2 className="font-editorial text-base text-[#f4efe6]">
+                {isJoint
+                  ? 'Facilitated Joint Dialogue'
+                  : `${currentPartner.name}'s Confidential Room`}
+              </h2>
+              <span className="text-[11px] text-[#857e72]">
+                {isJoint ? '· Direct with Middleman' : '· Shielded from partner'}
+              </span>
+            </div>
+            <p className="text-xs text-[#9c958a] mt-0.5">
               {isJoint
-                ? `Direct conversation between ${partnerA.name} & ${partnerB.name}. Middleman is actively buffering and clarifying.`
-                : `Messages sent here are heard ONLY by Middleman. Middleman talks FOR you to bridge to ${otherPartner.name}.`}
+                ? `Direct conversation between ${partnerA.name} and ${partnerB.name}. Middleman buffers and clarifies in real time.`
+                : `Messages sent here are heard ONLY by Middleman. Your partner cannot view this chat.`}
             </p>
           </div>
         </div>
 
         {/* Sender Switcher when in Joint Mode */}
         {isJoint && (
-          <div className="flex items-center gap-1.5 bg-stone-950 p-1 rounded-xl border border-stone-800">
-            <span className="text-[11px] text-stone-400 px-2 font-medium">Send as:</span>
+          <div className="flex items-center gap-1 bg-[#131211] p-1 rounded-lg border border-[#2a2825]">
+            <span className="text-[11px] text-[#787166] px-2 font-medium">Speaking as:</span>
             <button
               type="button"
               onClick={() => setJointSender('partner_a')}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+              className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
                 jointSender === 'partner_a'
-                  ? 'bg-emerald-700 text-white'
-                  : 'text-stone-400 hover:text-stone-200'
+                  ? 'bg-[#292623] text-[#f4efe6]'
+                  : 'text-[#8f887d] hover:text-[#e8e4dc]'
               }`}
             >
               {partnerA.name}
@@ -152,10 +141,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <button
               type="button"
               onClick={() => setJointSender('partner_b')}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+              className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
                 jointSender === 'partner_b'
-                  ? 'bg-amber-700 text-white'
-                  : 'text-stone-400 hover:text-stone-200'
+                  ? 'bg-[#292623] text-[#f4efe6]'
+                  : 'text-[#8f887d] hover:text-[#e8e4dc]'
               }`}
             >
               {partnerB.name}
@@ -165,13 +154,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar bg-[#141312]">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-stone-400">
-            <MessageSquare className="w-10 h-10 text-stone-600 mb-2" />
-            <p className="text-sm font-medium text-stone-300">No messages in this room yet.</p>
-            <p className="text-xs text-stone-500 mt-1">
-              Start by typing your perspective or choose a quick prompt below.
+          <div className="h-full flex flex-col items-center justify-center text-center p-8 text-[#7d776e]">
+            <MessageSquare className="w-8 h-8 text-[#3d3832] mb-3" />
+            <p className="font-editorial text-base text-[#c7baa7]">This chamber is quiet.</p>
+            <p className="text-xs text-[#7d776e] mt-1 max-w-sm leading-relaxed">
+              Express what happened without fear of inflaming the argument. Middleman listens, validates, and helps build understanding.
             </p>
           </div>
         ) : (
@@ -185,29 +174,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
           ))
         )}
 
-        {/* Typing indicator */}
-        {isLoading && (
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-stone-900 border border-stone-800 text-xs text-stone-300 w-fit">
-            <Sparkles className="w-3.5 h-3.5 text-teal-400 animate-spin" />
-            <span>Middleman is analyzing ambiguities and contrastructing...</span>
-          </div>
-        )}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Prompts Bar */}
-      <div className="px-4 py-2 bg-stone-900/50 border-t border-stone-800/80">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs text-stone-400 scrollbar-none">
-          <span className="text-[11px] font-medium text-stone-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Flame className="w-3 h-3 text-amber-500" /> Ideas:
+      {/* Thought Starters / Prompts Bar */}
+      <div className="px-5 py-2.5 bg-[#1a1917] border-t border-[#2b2824]">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs text-[#8f887d] scrollbar-none">
+          <span className="text-[11px] text-[#706a61] uppercase tracking-wider shrink-0 font-medium">
+            Reflective prompts:
           </span>
           {quickPrompts.map((prompt, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => setInputText(prompt)}
-              className="shrink-0 bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-stone-100 px-2.5 py-1 rounded-lg border border-stone-700/60 transition-colors text-left max-w-xs truncate"
+              className="shrink-0 bg-[#23211f] hover:bg-[#2b2825] text-[#b8b0a2] hover:text-[#f4efe6] px-3 py-1 rounded-md border border-[#332f2a] transition-colors text-left max-w-xs truncate text-xs"
               title={prompt}
             >
               {prompt}
@@ -216,10 +197,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
       </div>
 
-      {/* Input Form */}
+      {/* Input Form with Conveyance Deforming Offer Action */}
       <form
         onSubmit={handleSubmit}
-        className="p-3 bg-stone-900 border-t border-stone-800 flex items-center gap-2"
+        className="p-3.5 bg-[#191816] border-t border-[#2b2824] flex items-center gap-3"
       >
         <input
           type="text"
@@ -227,20 +208,41 @@ export const ChatView: React.FC<ChatViewProps> = ({
           onChange={(e) => setInputText(e.target.value)}
           placeholder={
             isJoint
-              ? `Speak directly to ${jointSender === 'partner_a' ? partnerB.name : partnerA.name}...`
-              : `Tell Middleman what happened (only heard by AI)...`
+              ? `Direct message to ${jointSender === 'partner_a' ? partnerB.name : partnerA.name}...`
+              : `Express what you're experiencing (only Middleman hears this)...`
           }
           disabled={isLoading}
-          className="flex-1 bg-stone-950 border border-stone-700 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 disabled:opacity-50"
+          className="flex-1 bg-[#131211] border border-[#332f2a] rounded-lg px-4 py-2.5 text-sm text-[#f4efe6] placeholder-[#6e685f] focus:outline-none focus:border-[#d4975c] transition-colors disabled:opacity-50"
         />
 
+        {/* Convey Offer Action: Deforms under its own load without detached spinners */}
         <button
           type="submit"
-          disabled={!inputText.trim() || isLoading}
-          className="px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
+          disabled={(!inputText.trim() && !isLoading) || isLoading}
+          className={`h-10 px-5 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-all duration-300 ${
+            isLoading
+              ? 'bg-[#2b241e] text-[#d4975c] border border-[#d4975c]/40 cursor-wait min-w-[150px]'
+              : justSent
+              ? 'bg-[#1e261f] text-[#9bb098] border border-[#9bb098]/40 min-w-[90px]'
+              : !inputText.trim()
+              ? 'bg-[#23211f] text-[#615b52] border border-[#2e2a26] cursor-not-allowed'
+              : 'bg-[#d4975c] hover:bg-[#c4874d] text-[#141312] font-semibold cursor-pointer shadow-xs active:scale-98'
+          }`}
         >
-          <span>Send</span>
-          <Send className="w-3.5 h-3.5" />
+          {isLoading ? (
+            <span className="flex items-center gap-2 font-editorial italic text-xs animate-calm-pulse">
+              Contemplating...
+            </span>
+          ) : justSent ? (
+            <span className="flex items-center gap-1.5 text-xs font-ui">
+              Received
+            </span>
+          ) : (
+            <>
+              <span>Send</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </>
+          )}
         </button>
       </form>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, FolderGit2, Check, Sparkles, PlusCircle } from 'lucide-react';
+import { X, FolderGit2, Plus } from 'lucide-react';
 
 interface ScenarioModalProps {
   isOpen: boolean;
@@ -54,49 +54,49 @@ export const ScenarioModal: React.FC<ScenarioModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-stone-900 border border-stone-700 max-w-xl w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-[#181716] border border-[#2b2824] max-w-lg w-full rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-4 bg-stone-950/80 border-b border-stone-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-teal-600/20 border border-teal-500/40 flex items-center justify-center text-teal-400">
+        <div className="p-5 bg-[#1d1b19] border-b border-[#262421] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#282420] border border-[#3d372e] flex items-center justify-center text-[#d4975c]">
               <FolderGit2 className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-stone-100">
-                Select Couple Mediation Scenario
+              <h3 className="font-editorial text-lg text-[#f4efe6]">
+                Select Dispute Scenario
               </h3>
-              <p className="text-xs text-stone-400">
-                Choose a realistic dispute or enter your own
+              <p className="text-xs text-[#9c958a]">
+                Choose an archetype or configure your own
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors"
+            className="p-1.5 rounded-md text-[#8a8377] hover:text-[#f4efe6] hover:bg-[#282522] transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-stone-800 bg-stone-950/40 px-4 pt-2">
+        <div className="flex border-b border-[#262421] bg-[#161514] px-5 pt-2.5 gap-2 text-xs">
           <button
             onClick={() => setActiveTab('presets')}
-            className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${
+            className={`pb-2.5 px-2 font-medium border-b-2 transition-colors ${
               activeTab === 'presets'
-                ? 'border-teal-500 text-teal-400'
-                : 'border-transparent text-stone-400 hover:text-stone-200'
+                ? 'border-[#d4975c] text-[#f4efe6]'
+                : 'border-transparent text-[#8a8377] hover:text-[#e8e4dc]'
             }`}
           >
             Pre-built Disagreements
           </button>
           <button
             onClick={() => setActiveTab('custom')}
-            className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${
+            className={`pb-2.5 px-2 font-medium border-b-2 transition-colors ${
               activeTab === 'custom'
-                ? 'border-teal-500 text-teal-400'
-                : 'border-transparent text-stone-400 hover:text-stone-200'
+                ? 'border-[#d4975c] text-[#f4efe6]'
+                : 'border-transparent text-[#8a8377] hover:text-[#e8e4dc]'
             }`}
           >
             Custom Conflict
@@ -104,9 +104,9 @@ export const ScenarioModal: React.FC<ScenarioModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-4 overflow-y-auto space-y-3 flex-1 custom-scrollbar">
+        <div className="p-5 overflow-y-auto space-y-3 flex-1 custom-scrollbar text-xs">
           {activeTab === 'presets' ? (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {presets.map((preset) => {
                 const isSelected = currentScenarioTitle === preset.title;
                 return (
@@ -116,21 +116,21 @@ export const ScenarioModal: React.FC<ScenarioModalProps> = ({
                       onSelectScenario(preset.id);
                       onClose();
                     }}
-                    className={`w-full text-left p-3.5 rounded-xl border transition-all flex flex-col gap-1 ${
+                    className={`w-full text-left p-4 rounded-lg border transition-all flex flex-col gap-1.5 ${
                       isSelected
-                        ? 'bg-teal-950/40 border-teal-600/70 shadow-sm ring-1 ring-teal-500/30'
-                        : 'bg-stone-950/60 border-stone-800 hover:border-stone-700 hover:bg-stone-800/40'
+                        ? 'bg-[#211e1b] border-[#d4975c] shadow-xs'
+                        : 'bg-[#141312] border-[#282623] hover:border-[#38332c] hover:bg-[#1a1917]'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-stone-100 text-sm">
+                      <span className="font-editorial text-sm font-medium text-[#f4efe6]">
                         {preset.title}
                       </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-stone-800 text-stone-300">
+                      <span className="text-[11px] text-[#8a8377]">
                         {preset.partners}
                       </span>
                     </div>
-                    <p className="text-xs text-stone-400 leading-relaxed mt-1">
+                    <p className="text-xs text-[#a8a195] leading-relaxed">
                       {preset.desc}
                     </p>
                   </button>
@@ -138,9 +138,9 @@ export const ScenarioModal: React.FC<ScenarioModalProps> = ({
               })}
             </div>
           ) : (
-            <form onSubmit={handleCustomSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleCustomSubmit} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-stone-300 font-medium mb-1">
+                <label className="block text-[#bbb3a6] font-medium mb-1">
                   Partner A Name:
                 </label>
                 <input
@@ -149,12 +149,12 @@ export const ScenarioModal: React.FC<ScenarioModalProps> = ({
                   placeholder="e.g. Maya"
                   value={customA}
                   onChange={(e) => setCustomA(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-[#141312] border border-[#2e2b27] rounded-md px-3 py-2 text-[#f4efe6] placeholder-[#615b52] focus:outline-none focus:border-[#d4975c]"
                 />
               </div>
 
               <div>
-                <label className="block text-stone-300 font-medium mb-1">
+                <label className="block text-[#bbb3a6] font-medium mb-1">
                   Partner B Name:
                 </label>
                 <input
@@ -163,28 +163,28 @@ export const ScenarioModal: React.FC<ScenarioModalProps> = ({
                   placeholder="e.g. David"
                   value={customB}
                   onChange={(e) => setCustomB(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-[#141312] border border-[#2e2b27] rounded-md px-3 py-2 text-[#f4efe6] placeholder-[#615b52] focus:outline-none focus:border-[#d4975c]"
                 />
               </div>
 
               <div>
-                <label className="block text-stone-300 font-medium mb-1">
+                <label className="block text-[#bbb3a6] font-medium mb-1">
                   Conflict Topic / Core Issue:
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Disagreement over moving cities or saving money"
+                  placeholder="e.g. Disagreement over relocating or holiday commitments"
                   value={customTopic}
                   onChange={(e) => setCustomTopic(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-[#141312] border border-[#2e2b27] rounded-md px-3 py-2 text-[#f4efe6] placeholder-[#615b52] focus:outline-none focus:border-[#d4975c]"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full mt-3 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-medium rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5"
+                className="w-full mt-2 py-2.5 bg-[#d4975c] hover:bg-[#c4874d] text-[#141312] font-semibold rounded-md transition-colors flex items-center justify-center gap-2"
               >
-                <PlusCircle className="w-4 h-4" />
+                <Plus className="w-4 h-4" />
                 <span>Initialize Custom Session</span>
               </button>
             </form>
