@@ -26,7 +26,7 @@ object HeuristicMediator : Mediator {
 
     private val themes = listOf(
         Theme(
-            listOf("help", "chore", "dish", "clean", "house", "trash", "laundry"),
+            listOf("help", "chore", "dish", "clean", "housework", "around the house", "trash", "laundry", "team"),
             need = "Partnership, and not carrying the daily weight alone",
             contrast = { s, o -> "$s experiences undone tasks as an invisible, lonely burden; $o may hear requests as criticism they can't win." },
             ground = { s, o -> "$s and $o both want a home that feels like a team, not a workplace with a supervisor." },
@@ -44,7 +44,7 @@ object HeuristicMediator : Mediator {
             bridge = "When it goes quiet between us I feel disconnected, and I want to find a rhythm that feels safe for both of us.",
         ),
         Theme(
-            listOf("work", "late", "forgot", "priority", "anniversary", "birthday", "time", "busy"),
+            listOf("work", "job", "late", "forgot", "priority", "anniversary", "birthday", "time", "busy", "layoff", "money", "mortgage"),
             need = "Priority, and time that is protected from everything else",
             contrast = { s, o -> "$s measures love in undivided time; $o may measure it in effort spent securing the future." },
             ground = { s, o -> "$s and $o are both investing in the same life, one through presence and one through protection." },
@@ -75,7 +75,9 @@ object HeuristicMediator : Mediator {
 
     override suspend fun counsel(ctx: PrivateContext): Counsel {
         val lower = ctx.text.lowercase()
-        val t = themes.firstOrNull { th -> th.triggers.any { it in lower } } ?: fallbackTheme
+        // Most trigger hits wins; one stray word ("house") shouldn't decide what the fight is about.
+        val t = themes.map { th -> th to th.triggers.count { it in lower } }.filter { it.second > 0 }.maxByOrNull { it.second }?.first
+            ?: fallbackTheme
         val s = ctx.speaker.name
         val o = ctx.others.map { it.name }.joinedNaturally().ifEmpty { "the others" }
         val alerts = CleanFight.check(ctx.text)

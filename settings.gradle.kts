@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 // composeApp — Compose Multiplatform UI (Android library, iOS framework, desktop, wasm)
 // androidApp — the Play Store application shell
 // server     — Ktor backend: sessions, privacy sanitization, mediator providers
-include(":shared", ":server")
+include(":shared", ":composeApp", ":androidApp", ":server")

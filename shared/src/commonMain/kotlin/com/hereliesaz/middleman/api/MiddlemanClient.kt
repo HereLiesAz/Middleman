@@ -13,6 +13,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
@@ -37,7 +38,8 @@ class MiddlemanClient(private val baseUrl: String, engine: HttpClient = HttpClie
         defaultRequest { url(baseUrl.trimEnd('/') + "/") }
         HttpResponseValidator {
             validateResponse { r ->
-                if (!r.status.isSuccess()) {
+                // 101 is the WebSocket handshake succeeding, not an error.
+                if (!r.status.isSuccess() && r.status != HttpStatusCode.SwitchingProtocols) {
                     val msg = runCatching { r.body<ApiError>().error }.getOrNull() ?: r.status.description
                     throw MiddlemanException(msg)
                 }

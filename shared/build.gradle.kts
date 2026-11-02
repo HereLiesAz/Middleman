@@ -13,7 +13,6 @@ kotlin {
         minSdk = libs.versions.android.minSdk.get().toInt()
     }
     jvm()
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
