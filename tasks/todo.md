@@ -37,3 +37,41 @@ Bugs caught by verification:
 - The client rejected the `101 Switching Protocols` WebSocket handshake, so live updates would never have connected.
 - No root content color was set, so most text rendered near-black on black.
 - The heuristic picked a theme from its first matching keyword ("house" → chores); now the theme with the most matches wins.
+
+---
+
+# v2: Middleman is the timeout (relay model). PLAN, awaiting confirmation
+
+## Model
+- Starting a session is a softer kind of block: "talk to me through Middleman until you can be respectful."
+- Each participant has **one room: theirs, with Middleman**. No joint room, no readiness gate, no timeouts.
+- **Relay:** whatever someone wants the others to hear, Middleman delivers, but in its own words.
+  It paraphrases, strips cruelty and threats, keeps the substance, and delivers it into each other room as
+  "From Alex, through Middleman: …". The sender sees exactly what was delivered.
+  - Detection: the mediator decides each turn whether the message includes something for the others (`relay: string | null`).
+  - Pure abuse with no substance gets nothing delivered; the sender is told why.
+- **Groups kept:** a starter plus any number of others. Relays go to everyone else.
+- **Link:** the starter gets `https://middleman.hereliesaz.com/j/<code>` to share. On Android it opens the app (App Links); anywhere else, the web app.
+
+## Lifetime
+- **Resolution is Middleman's call**, not the starter's (the starter may be the one in the wrong).
+  After each turn the mediator returns `resolved: { reason } | null`. Resolution requires a recent turn from everyone.
+- **Optional expiry**, set by the starter at creation: none / 1 / 3 / 7 / 30 days.
+- **On resolution or expiry the session is deleted**, along with its messages and tokens. Clients get a final closing note
+  over the stream, then the session ceases to exist on the server.
+- **Supersede:** a stable anonymous device identity (random id, stored on the device) links people across sessions.
+  When someone joins a new session, any older live session containing both them and this session's starter is deleted.
+
+## Removed
+- Joint room, readiness score and meter, clean-fight *holding* (the rules now feed the paraphrase/censor), timeouts and breathing.
+- Consent button for bridges (relaying is now the core function).
+
+## Later: SMS (not in this phase)
+- Android only. iOS lets no app intercept or send SMS.
+- Middleman becomes the **default SMS app** (RoleManager.ROLE_SMS). The default app is the only one that receives texts first.
+  It sends and receives through the carrier with SmsManager, so no SMS provider or registered numbers are needed.
+- The cost: the default SMS app must be a complete messaging app (threads, MMS, notifications, the system message store),
+  because it replaces Google Messages. It can't hand texts on to another messaging app; Android allows exactly one.
+- Then a texter doesn't need the app at all. Texts from someone in an active mediation go to Middleman instead of the inbox,
+  and Middleman's paraphrase goes back out as SMS from the starter's own number.
+- Google Play allows SMS permissions only for apps that really are the default SMS handler. Declaration form required.
