@@ -1,6 +1,7 @@
 {
-  "run_id": "sync",
+  "run_id": "42069145543",
   "schema": 1,
-  "source_sha": "474f9109b5cbd075d03f49ab50536e5e6d7755a8",
-  "version": "0.0.0.0"
+  "source_sha": "a8c90e3361fe381a894d16c266b85a287dcf98c3",
+  "trigger_id": "manual-42069096213",
+  "version": "0.1.0.1"
 }
