@@ -84,7 +84,7 @@ Bugs caught by verification:
 - [x] mediators: heuristic and LLM prompt rewritten for relaying, withholding and settledness
 - [x] UI: single room, invite link copy, expiry picker, "what they heard", ended screen; joint room and timeouts removed
 - [x] Android App Links for `https://middleman.hereliesaz.com/j/*`; web reads its own path
-- [ ] Set `ANDROID_CERT_SHA256` on the server once the Play signing key exists, or App Links won't verify
+- [x] `ANDROID_CERT_SHA256` defaults to the release cert (CN=Az) in the Dockerfile; override for Play App Signing
 - [ ] SMS phase (default SMS app)
 
 ## v2 review
