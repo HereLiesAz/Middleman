@@ -17,20 +17,25 @@ android {
         applicationId = "com.hereliesaz.middleman"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = v("versionMajor") * 1_000_000 + v("versionMinor") * 10_000 + v("versionPatch") * 100 + v("versionBuild") % 100
+        // The central release workflow (HereLiesAz/workflows) supplies the next versionCode as -PversionCode.
+        versionCode = providers.gradleProperty("versionCode").map(String::toInt).orNull
+            ?: (v("versionMajor") * 1_000_000 + v("versionMinor") * 10_000 + v("versionPatch") * 100 + v("versionBuild") % 100)
         versionName = "${v("versionMajor")}.${v("versionMinor")}.${v("versionPatch")}"
     }
 
     buildFeatures { buildConfig = true }
 
-    // Release signing reads from the environment so the keystore never touches the repo.
-    val keystore = System.getenv("MIDDLEMAN_KEYSTORE")
+    // Release signing reads the environment so the keystore never touches the repo. The central release
+    // workflow provides KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD; the MIDDLEMAN_* names
+    // are the same four for a local signed build.
+    fun signingEnv(central: String, local: String) = System.getenv(central) ?: System.getenv(local)
+    val keystore = signingEnv("KEYSTORE_FILE", "MIDDLEMAN_KEYSTORE")
     signingConfigs {
         if (keystore != null) create("release") {
             storeFile = file(keystore)
-            storePassword = System.getenv("MIDDLEMAN_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("MIDDLEMAN_KEY_ALIAS")
-            keyPassword = System.getenv("MIDDLEMAN_KEY_PASSWORD")
+            storePassword = signingEnv("KEYSTORE_PASSWORD", "MIDDLEMAN_KEYSTORE_PASSWORD")
+            keyAlias = signingEnv("KEY_ALIAS", "MIDDLEMAN_KEY_ALIAS")
+            keyPassword = signingEnv("KEY_PASSWORD", "MIDDLEMAN_KEY_PASSWORD")
         }
     }
 

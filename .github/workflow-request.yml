@@ -1,0 +1,14 @@
+# CENTRAL WORKFLOW REQUEST
+#
+# Executable workflows live in HereLiesAz/workflows. The only workflow implemented here is CI
+# (.github/workflows/build.yml), which runs in this repository. The Android release is a trigger
+# contract (.github/workflows/android-github-release.yml) that the central sync binds to the shared
+# android-github-release workflow; its profile lives in HereLiesAz/workflows (scripts/semantic_catalog.py).
+requested:
+  - android-github-release
+
+new_workflow_request:
+  name: ""
+  purpose: ""
+  required_inputs: []
+  required_secrets: []
