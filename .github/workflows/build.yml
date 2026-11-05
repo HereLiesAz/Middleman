@@ -3,8 +3,14 @@ name: Build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Publish an Android release (APK + AAB) as a GitHub Release
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -47,6 +53,76 @@ jobs:
         with:
           name: middleman-web
           path: composeApp/build/dist/wasmJs/productionExecutable
+
+  # Publishes installable Android builds. Runs for a pushed v* tag, or a manual run with "release" ticked.
+  #
+  # Signing: with the repository secrets MIDDLEMAN_KEYSTORE_BASE64, MIDDLEMAN_KEYSTORE_PASSWORD,
+  # MIDDLEMAN_KEY_ALIAS and MIDDLEMAN_KEY_PASSWORD set, the release is signed with your key. Without
+  # them it is signed with a throwaway key made for this run and published as a PRE-RELEASE: that APK
+  # installs for testing, but cannot be uploaded to Google Play or updated in place by a later build.
+  android-release:
+    name: Android release
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
+    needs: [jvm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Signing key
+        env:
+          KS_B64: ${{ secrets.MIDDLEMAN_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.MIDDLEMAN_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.MIDDLEMAN_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.MIDDLEMAN_KEY_PASSWORD }}
+        run: |
+          KS="$RUNNER_TEMP/middleman.jks"
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$KS"
+            echo "SIGNING=release" >> "$GITHUB_ENV"
+          else
+            KS_PASS="$(openssl rand -hex 16)"; KS_KEY_PASS="$KS_PASS"; KS_ALIAS=throwaway
+            echo "::add-mask::$KS_PASS"
+            keytool -genkeypair -keystore "$KS" -storepass "$KS_PASS" -keypass "$KS_KEY_PASS" \
+              -alias "$KS_ALIAS" -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Middleman test build"
+            echo "SIGNING=test" >> "$GITHUB_ENV"
+          fi
+          {
+            echo "MIDDLEMAN_KEYSTORE=$KS"
+            echo "MIDDLEMAN_KEYSTORE_PASSWORD=$KS_PASS"
+            echo "MIDDLEMAN_KEY_ALIAS=$KS_ALIAS"
+            echo "MIDDLEMAN_KEY_PASSWORD=$KS_KEY_PASS"
+          } >> "$GITHUB_ENV"
+      - name: Build
+        run: ./gradlew :androidApp:assembleRelease :androidApp:bundleRelease
+      - name: Verify the APK is signed
+        run: |
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$APKSIGNER" verify --print-certs androidApp/build/outputs/apk/release/androidApp-release.apk
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(grep -E '^version(Major|Minor|Patch)=' version.properties | cut -d= -f2 | paste -sd. -)"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then TAG="$GITHUB_REF_NAME"; else TAG="v$VERSION"; fi
+          cp androidApp/build/outputs/apk/release/androidApp-release.apk "Middleman-$VERSION.apk"
+          cp androidApp/build/outputs/bundle/release/androidApp-release.aab "Middleman-$VERSION.aab"
+          if [ "$SIGNING" = "release" ]; then
+            FLAGS=""; NOTE="Signed with the release key."
+          else
+            FLAGS="--prerelease"
+            NOTE="TEST BUILD. Signed with a throwaway key made for this run: it installs for testing, but cannot be uploaded to Google Play or updated by a later build. Add the MIDDLEMAN_KEYSTORE_* repository secrets for real signing."
+          fi
+          NOTES="Middleman $VERSION for Android (minSdk 26). Install the APK; upload the AAB to Play. $NOTE"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "Middleman-$VERSION.apk" "Middleman-$VERSION.aab" --clobber
+          else
+            gh release create "$TAG" "Middleman-$VERSION.apk" "Middleman-$VERSION.aab" \
+              --target "$GITHUB_SHA" --title "Middleman $VERSION" --notes "$NOTES" $FLAGS
+          fi
 
   ios:
     name: iOS framework
