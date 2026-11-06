@@ -33,7 +33,12 @@ data class UiState(
  * The session itself is never written to the device; when it ends, it's gone.
  */
 @OptIn(ExperimentalUuidApi::class)
-class MiddlemanViewModel(private val store: KeyValueStore, defaultServer: String, inviteCode: String?) : ViewModel() {
+class MiddlemanViewModel(
+    private val store: KeyValueStore,
+    defaultServer: String,
+    inviteCode: String?,
+    val textBridge: TextBridge? = null,
+) : ViewModel() {
     private val _state = MutableStateFlow(UiState(serverUrl = store[KEY_SERVER] ?: defaultServer, inviteCode = inviteCode))
     val state: StateFlow<UiState> = _state
 
@@ -55,7 +60,23 @@ class MiddlemanViewModel(private val store: KeyValueStore, defaultServer: String
         _state.update { it.copy(serverUrl = url) }
     }
 
-    fun create(title: String, name: String, expiryDays: Int?) = act { signIn(client.create(title, name, deviceId, expiryDays)) }
+    /**
+     * Starts a mediation. With [theirNumber] and a [textBridge], also brings that person in by text;
+     * if that part fails the mediation still stands, and the error says so.
+     */
+    fun create(title: String, name: String, expiryDays: Int?, theirNumber: String? = null, theirName: String? = null) = act {
+        signIn(client.create(title, name, deviceId, expiryDays))
+        val bridge = textBridge
+        if (bridge != null && !theirNumber.isNullOrBlank()) {
+            val code = client.session(requireToken()).inviteCode
+            try {
+                bridge.open(theirNumber, theirName?.takeIf { it.isNotBlank() } ?: "Them", code, name)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _state.update { it.copy(error = "Started, but couldn't text them: ${e.message ?: "unknown error"}. Send them the link instead.") }
+            }
+        }
+    }
     fun join(code: String, name: String) = act { signIn(client.join(code, name, deviceId)) }
     fun say(text: String) = act { show(client.say(requireToken(), text)) }
     fun dismissError() = _state.update { it.copy(error = null) }

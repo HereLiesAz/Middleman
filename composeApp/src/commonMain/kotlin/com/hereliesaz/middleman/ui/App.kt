@@ -19,16 +19,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hereliesaz.middleman.KeyValueStore
 import com.hereliesaz.middleman.MiddlemanViewModel
+import com.hereliesaz.middleman.TextBridge
 
 /**
  * Root of every platform. Platforms differ only in [store], the server they default to, and
- * whether they were opened from an invite link ([inviteCode]).
+ * whether they were opened from an invite link ([inviteCode]) and whether they can [textBridge].
  */
 @Composable
-fun App(store: KeyValueStore, defaultServer: String, inviteCode: String? = null) = MiddlemanTheme {
-    val vm = viewModel { MiddlemanViewModel(store, defaultServer, inviteCode) }
+fun App(store: KeyValueStore, defaultServer: String, inviteCode: String? = null, textBridge: TextBridge? = null) = MiddlemanTheme {
+    val vm = viewModel { MiddlemanViewModel(store, defaultServer, inviteCode, textBridge) }
     val state by vm.state.collectAsStateWithLifecycle()
     var showingExamples by remember { mutableStateOf(false) }
+    var showingMessages by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(state.error) {
@@ -41,7 +43,8 @@ fun App(store: KeyValueStore, defaultServer: String, inviteCode: String? = null)
         when {
             state.ending != null -> EndedScreen(state.ending!!, onDone = vm::dismissEnding)
             showingExamples -> ExamplesScreen(onBack = { showingExamples = false })
-            !state.signedIn -> ThresholdScreen(state, vm, onExamples = { showingExamples = true })
+            showingMessages && textBridge != null -> textBridge.Messages(onBack = { showingMessages = false })
+            !state.signedIn -> ThresholdScreen(state, vm, onExamples = { showingExamples = true }, onMessages = { showingMessages = true })
             session == null -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = Ink.Bone)
             else -> SessionScreen(session, state, vm)
         }

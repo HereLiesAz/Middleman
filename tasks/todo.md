@@ -18,7 +18,7 @@
 - [x] Android app: AAB, R8, env-based signing, cleartext only in debug, backup exclusion, adaptive monochrome icon
 - [x] Delete TS/PWA and debris; rewrite README
 - [x] CI workflow (Linux: tests + all JVM/Android/web builds; macOS: iOS framework)
-- [ ] iOS Xcode project (needs a Mac; steps in `iosApp/README.md`)
+- [x] iOS Xcode project committed, built unsigned for the simulator by CI (not run on a device)
 - [ ] Production server URL for release builds (`-Pmiddleman.server=`; placeholder default)
 
 ## Review
@@ -85,7 +85,21 @@ Bugs caught by verification:
 - [x] UI: single room, invite link copy, expiry picker, "what they heard", ended screen; joint room and timeouts removed
 - [x] Android App Links for `https://middleman.hereliesaz.com/j/*`; web reads its own path
 - [x] `ANDROID_CERT_SHA256` defaults to the release cert (CN=Az) in the Dockerfile; override for Play App Signing
-- [ ] SMS phase (default SMS app)
+- [x] SMS slice 1: core + intercept (built; needs a device to verify)
+- [x] SMS: MMS (codec tested; carrier behavior unverified), contact names, delivery receipts
+
+## SMS slice 1 plan
+Design: the starter's phone hosts the counterpart's room. It joins its own session as a second participant (a hash of
+starter device + number is the device id; the number itself never leaves the phone), so the server is unchanged.
+Inbound SMS from that number is `say` in that room; Middleman's messages in that room go out as SMS from the starter's number.
+Nothing from a mediation is written to the system SMS store.
+- [x] shared: `PhoneNumbers.key`, `SmsBridge` (open/resume/incoming/watch, persisted via `BridgeBook`) + tests
+- [x] server test: bridge against the real routes to RESOLVED (found and fixed a race: the ending was lost when the stream missed its last frame)
+- [x] androidApp: manifest (default-SMS requirements), deliver receivers, SmsManager sender, role request, bridge runtime + foreground service
+- [x] androidApp: plain inbox write for non-mediation texts, notification, minimal conversation list/thread/compose
+- [x] composeApp: optional "their number" on start (hook only, other platforms unchanged)
+- [x] MMS: receiver stub only (default-app eligibility); real MMS still to do
+- Not verifiable here: the default-SMS role, real carrier send/receive. Needs a device.
 
 ## v2 review
 - `:shared:jvmTest` 7/7, `:server:test` 14/14, including the shipped client streaming a mediation to its RESOLVED frame.
