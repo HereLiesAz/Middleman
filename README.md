@@ -94,6 +94,15 @@ The output is `androidApp/build/outputs/bundle/release/androidApp-release.aab`. 
 
 The server suite drives the app's own `MiddlemanClient`, including the live stream to the final "resolved" frame, against the real routes. It also checks that private words stay private, relays are paraphrased rather than forwarded, pure abuse is withheld, one settled person isn't resolution, a new mediation between the same people deletes the old one, and expiry deletes.
 
-## Next: SMS
+## SMS (Android)
 
-Android only. Middleman becomes the phone's default SMS app, so it reads the existing SMS/MMS history from the system message store and shows it in its own messaging screens. Texts from someone in an active mediation go to Middleman instead of the inbox, and Middleman's paraphrase goes back out as an SMS from your own number, so the other person needs no app at all. iOS doesn't allow this.
+Android only; iOS lets no app handle texts. Starting a mediation takes an optional number, so the other person needs no app.
+
+- **Making it work.** The sender must make Middleman their default messaging app (the only way Android lets one app receive texts first). Without it, the number field offers to ask.
+- **How it carries them.** The starter's phone joins its own mediation as a second participant standing in for the texter. Their texts are said in that participant's room. Whatever Middleman says there is texted back from the starter's own number, each prefixed `Middleman:` so it can't pass for the starter. The number never reaches the server; it sees a name and a device id that is a hash of the starter's device and the number.
+- **Nothing is kept.** Texts from someone in a mediation are written nowhere on the phone. The bridge is forgotten when the mediation ends. Texts from anyone else are filed in the system inbox like any messaging app.
+- **Messaging screens.** Conversation list, thread and a compose box, over the system message store.
+- **Not done: MMS.** Picture messages are received by the system and dropped. Do this before Middleman is anyone's only messaging app.
+- **Not tested on a device.** The bridge is tested against the real server routes. The default-app role, carrier sending and the foreground service need a phone.
+- **Play.** SMS permissions are allowed only for apps that really are the default handler, and need Google's Permissions Declaration Form.
+- **Limit.** Android caps the keep-alive service at a few hours at a stretch. If the system stops it, the next text or opening the app resumes the bridge.

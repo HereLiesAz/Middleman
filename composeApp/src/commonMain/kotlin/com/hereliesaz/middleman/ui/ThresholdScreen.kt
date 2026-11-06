@@ -20,9 +20,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.middleman.MiddlemanViewModel
@@ -33,12 +35,16 @@ private enum class Door { START, JOIN }
 
 /** The way in. Start a mediation and hand out the code, or walk in with one. */
 @Composable
-fun ThresholdScreen(state: UiState, vm: MiddlemanViewModel, onExamples: () -> Unit) {
+fun ThresholdScreen(state: UiState, vm: MiddlemanViewModel, onExamples: () -> Unit, onMessages: () -> Unit = {}) {
     var door by remember { mutableStateOf(if (state.inviteCode != null) Door.JOIN else Door.START) }
     var name by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var code by remember { mutableStateOf(state.inviteCode.orEmpty()) }
     var expiry by remember { mutableStateOf<Int?>(null) }
+    var theirNumber by remember { mutableStateOf("") }
+    var theirName by remember { mutableStateOf("") }
+    val bridge = vm.textBridge
+    val textReady = bridge?.ready?.collectAsStateWithLifecycle()?.value ?: false
     var editingServer by remember { mutableStateOf(false) }
     var server by remember(state.serverUrl) { mutableStateOf(state.serverUrl) }
 
@@ -65,6 +71,22 @@ fun ThresholdScreen(state: UiState, vm: MiddlemanViewModel, onExamples: () -> Un
             Spacer(Modifier.height(12.dp))
             if (door == Door.START) {
                 Field(title, { title = it }, "What's it about? (only a title)", capitalization = KeyboardCapitalization.Sentences)
+                if (bridge != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Field(theirNumber, { theirNumber = it }, "Their number (they don't need the app)", keyboard = KeyboardOptions(keyboardType = KeyboardType.Phone))
+                    if (theirNumber.isNotBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        Field(theirName, { theirName = it }, "Their name", capitalization = KeyboardCapitalization.Words)
+                        if (!textReady) {
+                            Text(
+                                "To carry their texts, Middleman has to be your messaging app.",
+                                style = MaterialTheme.typography.bodyMedium, color = Ink.Fog, textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                            TextButton(onClick = bridge::requestReady) { Text("Make Middleman my messaging app", color = Ink.Bone) }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
                 Text("DELETE IT ANYWAY AFTER", style = MaterialTheme.typography.labelSmall, color = Ink.Fog)
                 Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -73,7 +95,10 @@ fun ThresholdScreen(state: UiState, vm: MiddlemanViewModel, onExamples: () -> Un
                     }
                 }
                 Spacer(Modifier.height(28.dp))
-                Solemn("ASK FOR SPACE", enabled = name.isNotBlank() && !state.busy) { vm.create(title, name, expiry) }
+                val texting = bridge != null && theirNumber.isNotBlank()
+                Solemn("ASK FOR SPACE", enabled = name.isNotBlank() && !state.busy && (!texting || textReady)) {
+                    vm.create(title, name, expiry, theirNumber.takeIf { texting }, theirName)
+                }
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "You'll get a link to send them. They can still reach you, but only through me, and only in words I'm willing to carry. When I judge it's over, it's deleted.",
@@ -93,6 +118,7 @@ fun ThresholdScreen(state: UiState, vm: MiddlemanViewModel, onExamples: () -> Un
 
             Spacer(Modifier.height(48.dp))
             TextButton(onClick = onExamples) { Text("How it works", color = Ink.Bone) }
+            if (bridge != null && textReady) TextButton(onClick = onMessages) { Text("Messages", color = Ink.Bone) }
             TextButton(onClick = { editingServer = !editingServer }) {
                 Text("Server: ${state.serverUrl}", style = MaterialTheme.typography.labelSmall, color = Ink.Fog)
             }

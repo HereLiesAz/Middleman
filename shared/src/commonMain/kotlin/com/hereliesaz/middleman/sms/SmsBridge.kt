@@ -47,14 +47,23 @@ class SmsBridge(
     private val client: MiddlemanClient,
     private val out: SmsOut,
     private val book: BridgeBook,
-    private val onChange: () -> Unit = {},
+    /** Called whenever the set of bridges changes, with whether any remain. */
+    private val onChange: (active: Boolean) -> Unit = {},
 ) {
     private val bridges = mutableMapOf<String, Bridge>()
     private val watchers = mutableMapOf<String, Job>()
     private val lock = Mutex()
+    /** Held while texting a view out, so the stream and a reply can't both send the same message. Always taken before [lock]. */
+    private val delivery = Mutex()
 
     /** True while any mediation is being carried by text. */
     suspend fun active(): Boolean = lock.withLock { bridges.isNotEmpty() }
+
+    /** Whether a text from [number] belongs to a mediation. Local and instant, so a receiver can decide before any network call. */
+    suspend fun carries(number: String): Boolean {
+        val key = PhoneNumbers.key(number) ?: return false
+        return lock.withLock { key in bridges }
+    }
 
     /** Picks up bridges saved before a restart. */
     suspend fun resume() = lock.withLock {
@@ -63,7 +72,7 @@ class SmsBridge(
             bridges[key] = b
             watch(key, b.token)
         }
-        onChange()
+        onChange(bridges.isNotEmpty())
     }
 
     /**
@@ -80,7 +89,7 @@ class SmsBridge(
             bridges[key] = bridge
             persist()
             watch(key, bridge.token)
-            onChange()
+            onChange(bridges.isNotEmpty())
         }
         out.send(number, say("$starterName has asked for space, and is talking to you through me. Reply here. I'll carry what matters and leave the rest."))
     }
@@ -92,16 +101,20 @@ class SmsBridge(
     suspend fun incoming(number: String, text: String): Boolean {
         val key = PhoneNumbers.key(number) ?: return false
         val bridge = lock.withLock { bridges[key] } ?: return false
-        try {
+        val view = try {
             client.say(bridge.token, text)
         } catch (e: CancellationException) {
             throw e
         } catch (e: MiddlemanException) {
             if (e.isFinal) { drop(key, bridge.token); return false }
-            out.send(bridge.number, say("I couldn't carry that just now. Say it again in a moment."))
+            out.send(bridge.number, say(RETRY))
+            return true
         } catch (e: Exception) {
-            out.send(bridge.number, say("I couldn't carry that just now. Say it again in a moment."))
+            out.send(bridge.number, say(RETRY))
+            return true
         }
+        // The reply carries the end of the mediation when this very text settled it; the stream may not.
+        deliver(key, bridge.token, view)
         return true
     }
 
@@ -122,7 +135,11 @@ class SmsBridge(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: MiddlemanException) {
-                    if (e.isFinal) { drop(key, token); return@launch }
+                    if (e.isFinal) {
+                        // Gone before its last frame reached us. They'd otherwise wait for a reply that will never come.
+                        drop(key, token)?.let { runCatching { out.send(it.number, say(GONE)) } }
+                        return@launch
+                    }
                 } catch (_: Exception) { }
                 delay(backoff)
                 backoff = (backoff * 2).coerceAtMost(30_000)
@@ -131,13 +148,13 @@ class SmsBridge(
     }
 
     /** Texts out anything Middleman has said since the last text. Returns false once the bridge is over. */
-    private suspend fun deliver(key: String, token: String, view: SessionView): Boolean {
-        val bridge = lock.withLock { bridges[key]?.takeIf { it.token == token } } ?: return false
+    private suspend fun deliver(key: String, token: String, view: SessionView): Boolean = delivery.withLock {
+        val bridge = lock.withLock { bridges[key]?.takeIf { it.token == token } } ?: return@withLock false
         view.ending?.let { ending ->
             // A replaced mediation is silent: the same people are already being invited to the next one.
             if (ending.reason != EndReason.REPLACED) out.send(bridge.number, say(ending.note))
             drop(key, token)
-            return false
+            return@withLock false
         }
         val room = view.room
         val fresh = room.drop(room.indexOfFirst { it.id == bridge.sentUpTo } + 1)
@@ -145,23 +162,30 @@ class SmsBridge(
             if (m.authorId == null) out.send(bridge.number, say(m.text))
             advance(key, token, m.id)
         }
-        return true
+        true
     }
 
     private suspend fun advance(key: String, token: String, id: String) = lock.withLock {
         bridges[key]?.takeIf { it.token == token }?.let { bridges[key] = it.copy(sentUpTo = id); persist() }
     }
 
-    private suspend fun drop(key: String, token: String) = lock.withLock {
-        if (bridges[key]?.token != token) return@withLock
+    /** Forgets a bridge that has ended. Returns it, or null if it was already gone or replaced. */
+    private suspend fun drop(key: String, token: String): Bridge? = lock.withLock {
+        val bridge = bridges[key]?.takeIf { it.token == token } ?: return@withLock null
         bridges.remove(key)
         watchers.remove(key)?.cancel()
         persist()
-        onChange()
+        onChange(bridges.isNotEmpty())
+        bridge
     }
 
     private fun persist() = book.save(bridges.values.toList())
 
     /** Every text Middleman sends from someone's own number says so, or it would pass for them. */
     private fun say(text: String) = "Middleman: $text"
+
+    private companion object {
+        const val RETRY = "I couldn't carry that just now. Say it again in a moment."
+        const val GONE = "This mediation has ended. Everything said in it has been deleted."
+    }
 }
