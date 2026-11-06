@@ -18,7 +18,7 @@
 - [x] Android app: AAB, R8, env-based signing, cleartext only in debug, backup exclusion, adaptive monochrome icon
 - [x] Delete TS/PWA and debris; rewrite README
 - [x] CI workflow (Linux: tests + all JVM/Android/web builds; macOS: iOS framework)
-- [ ] iOS Xcode project (needs a Mac; steps in `iosApp/README.md`)
+- [x] iOS Xcode project committed, built unsigned for the simulator by CI (not run on a device)
 - [ ] Production server URL for release builds (`-Pmiddleman.server=`; placeholder default)
 
 ## Review

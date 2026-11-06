@@ -1,14 +1,9 @@
 # iosApp
 
-Thin SwiftUI shell around the shared Compose UI. The Xcode project is not committed yet; create it once on a Mac:
+SwiftUI shell around the shared Compose UI. Open `Middleman.xcodeproj` on a Mac and run the `Middleman` scheme.
 
-1. Xcode → New Project → iOS App, product name `Middleman`, bundle id `com.hereliesaz.middleman`, interface SwiftUI. Save it in this folder.
-2. Replace the generated app file with `iosApp/iOSApp.swift`.
-3. Build Phases → New Run Script Phase, placed before *Compile Sources*:
-   ~~~bash
-   cd "$SRCROOT/.."
-   ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode
-   ~~~
-4. Build Settings → *Framework Search Paths*: `$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)`
-   and *Other Linker Flags*: `-framework ComposeApp`. Set *User Script Sandboxing* to `No`.
-5. Info.plist: for local development against `http://localhost:8080`, add an App Transport Security exception for `localhost`.
+- The first build phase runs `./gradlew :composeApp:embedAndSignAppleFrameworkForXcode`, which builds the shared `ComposeApp` framework. JDK 21 must be on the path Xcode sees.
+- Debug builds talk to `http://localhost:8080` (allowed by `NSAllowsLocalNetworking` in `Info.plist`); release builds to `https://middleman.hereliesaz.com`.
+- CI builds the app for the simulator on every change (`.github/workflows/build.yml`, job `ios`), unsigned.
+- Not done: signing (pick your team in Xcode), universal links for invite links (needs an Associated Domains entitlement and an `apple-app-site-association` file on the server), and an app icon.
+- iOS lets no app handle texts, so the SMS bridge is Android only; the number field never appears here.
