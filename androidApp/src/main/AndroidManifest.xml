@@ -85,6 +85,14 @@
         </service>
 
         <receiver android:name=".sms.SmsStatusReceiver" android:exported="false" />
+        <receiver android:name=".sms.MmsDownloadedReceiver" android:exported="false" />
+        <receiver android:name=".sms.MmsSentReceiver" android:exported="false" />
+        <!-- The phone's messaging service reads and writes picture messages through this; files are random-named and short-lived. -->
+        <provider
+            android:name=".sms.MmsFileProvider"
+            android:authorities="${applicationId}.mms"
+            android:exported="true"
+            android:grantUriPermissions="false" />
 
         <!-- Keeps a mediation carried by text alive while the app is closed. -->
         <service

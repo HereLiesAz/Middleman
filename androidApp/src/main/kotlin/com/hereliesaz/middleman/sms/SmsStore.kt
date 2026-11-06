@@ -5,7 +5,7 @@ import android.content.Context
 import android.provider.Telephony
 
 data class Conversation(val id: Long, val address: String, val last: String, val date: Long)
-data class Text(val id: Long, val body: String, val date: Long, val mine: Boolean, val failed: Boolean = false, val delivered: Boolean = false)
+data class Text(val id: Long, val body: String, val date: Long, val mine: Boolean, val failed: Boolean = false, val delivered: Boolean = false, val image: Long? = null)
 
 /** Reads and writes the system message store. Only the default messaging app may, which is why Middleman asks to be one. */
 object SmsStore {
@@ -23,7 +23,12 @@ object SmsStore {
                 if (seen.add(id)) out += Conversation(id, c.getString(1).orEmpty(), c.getString(2).orEmpty(), c.getLong(3))
             }
         }
-        return out
+        // Picture messages share conversations with texts; the newest of either is what the list shows.
+        for (m in MmsStore.latest(context)) {
+            val i = out.indexOfFirst { it.id == m.id }
+            if (i < 0) out += m else if (m.date > out[i].date) out[i] = m.copy(address = out[i].address.ifBlank { m.address })
+        }
+        return out.sortedByDescending { it.date }
     }
 
     /** One conversation, oldest first. */
@@ -44,7 +49,7 @@ object SmsStore {
                 )
             }
         }
-        return out
+        return (out + MmsStore.thread(context, id)).sortedBy { it.date }
     }
 
     /** Sends an ordinary text and files it as sent. (Mediation traffic never comes through here.) */

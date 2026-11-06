@@ -12,10 +12,12 @@ class SmsSender(private val context: Context) : SmsOut {
     override suspend fun send(number: String, text: String) = Companion.send(context, number, text)
 
     companion object {
+        fun manager(context: Context): SmsManager = if (Build.VERSION.SDK_INT >= 31) context.getSystemService(SmsManager::class.java)
+        else @Suppress("DEPRECATION") SmsManager.getDefault()
+
         /** Sends [text]. With [row], the carrier's sent and delivered reports are written onto that message. */
         fun send(context: Context, number: String, text: String, row: Uri? = null) {
-            val manager = if (Build.VERSION.SDK_INT >= 31) context.getSystemService(SmsManager::class.java)
-            else @Suppress("DEPRECATION") SmsManager.getDefault()
+            val manager = manager(context)
             val parts = manager.divideMessage(text)
             fun reports(action: String) = row?.let {
                 val intent = Intent(action, it, context, SmsStatusReceiver::class.java)

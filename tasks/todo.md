@@ -86,7 +86,7 @@ Bugs caught by verification:
 - [x] Android App Links for `https://middleman.hereliesaz.com/j/*`; web reads its own path
 - [x] `ANDROID_CERT_SHA256` defaults to the release cert (CN=Az) in the Dockerfile; override for Play App Signing
 - [x] SMS slice 1: core + intercept (built; needs a device to verify)
-- [ ] SMS: MMS, contact names, delivery receipts
+- [x] SMS: MMS (codec tested; carrier behavior unverified), contact names, delivery receipts
 
 ## SMS slice 1 plan
 Design: the starter's phone hosts the counterpart's room. It joins its own session as a second participant (a hash of
