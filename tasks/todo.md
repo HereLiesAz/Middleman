@@ -85,7 +85,20 @@ Bugs caught by verification:
 - [x] UI: single room, invite link copy, expiry picker, "what they heard", ended screen; joint room and timeouts removed
 - [x] Android App Links for `https://middleman.hereliesaz.com/j/*`; web reads its own path
 - [x] `ANDROID_CERT_SHA256` defaults to the release cert (CN=Az) in the Dockerfile; override for Play App Signing
-- [ ] SMS phase (default SMS app)
+- [ ] SMS phase (default SMS app), slice 1: core + intercept (plan below)
+
+## SMS slice 1 plan
+Design: the starter's phone hosts the counterpart's room. It joins its own session as a second participant (a hash of
+starter device + number is the device id; the number itself never leaves the phone), so the server is unchanged.
+Inbound SMS from that number is `say` in that room; Middleman's messages in that room go out as SMS from the starter's number.
+Nothing from a mediation is written to the system SMS store.
+- [ ] shared: `PhoneNumbers.key`, `SmsBridge` (open/resume/incoming/watch, persisted via `BridgeBook`) + tests
+- [ ] server test: bridge against the real routes to RESOLVED
+- [ ] androidApp: manifest (default-SMS requirements), deliver receivers, SmsManager sender, role request, bridge runtime + foreground service
+- [ ] androidApp: plain inbox write for non-mediation texts, notification, minimal conversation list/thread/compose
+- [ ] composeApp: optional "their number" on start (hook only, other platforms unchanged)
+- [ ] MMS: receiver stub only (default-app eligibility); real MMS later
+- Not verifiable here: the default-SMS role, real carrier send/receive. Needs a device.
 
 ## v2 review
 - `:shared:jvmTest` 7/7, `:server:test` 14/14, including the shipped client streaming a mediation to its RESOLVED frame.
