@@ -42,6 +42,6 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             put(Telephony.Sms.SEEN, 0)
         }
         runCatching { context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, row) }
-        Notifier.incoming(context, from, body)
+        Notifier.incoming(context, Contacts.label(context, from), body, from)
     }
 }

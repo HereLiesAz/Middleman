@@ -62,7 +62,7 @@ fun MessagesScreen(onBack: () -> Unit) {
             LazyColumn {
                 items(conversations, key = { it.id }) { c ->
                     Column(Modifier.fillMaxWidth().clickable { open = c }.padding(vertical = 12.dp)) {
-                        Text(c.address, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                        Text(Contacts.label(context, c.address), style = MaterialTheme.typography.titleMedium, maxLines = 1)
                         Text(c.last, style = MaterialTheme.typography.bodyMedium, color = Ink.Fog, maxLines = 2)
                     }
                     HorizontalDivider(color = Ink.Smoke)
@@ -75,11 +75,11 @@ fun MessagesScreen(onBack: () -> Unit) {
         val list = rememberLazyListState()
         LaunchedEffect(texts.size) { if (texts.isNotEmpty()) list.scrollToItem(texts.lastIndex) }
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
-            TextButton(onClick = { open = null }) { Text("‹ ${current.address}", color = Ink.Bone) }
+            TextButton(onClick = { open = null }) { Text("‹ ${Contacts.label(context, current.address)}", color = Ink.Bone) }
             LazyColumn(Modifier.weight(1f), state = list, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(texts, key = { it.id }) { t ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (t.mine) Arrangement.End else Arrangement.Start) {
-                        Text(t.body, color = if (t.mine) Ink.Light else Ink.Bone, modifier = Modifier.fillMaxWidth(0.8f), textAlign = if (t.mine) TextAlign.End else TextAlign.Start)
+                        Text(t.body + if (t.failed) "  ✗ not sent" else if (t.delivered) "  ✓" else "", color = if (t.mine) Ink.Light else Ink.Bone, modifier = Modifier.fillMaxWidth(0.8f), textAlign = if (t.mine) TextAlign.End else TextAlign.Start)
                     }
                 }
             }

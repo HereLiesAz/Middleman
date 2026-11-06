@@ -27,12 +27,12 @@ object Notifier {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    fun incoming(context: Context, from: String, body: String) {
+    fun incoming(context: Context, title: String, body: String, from: String) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         channels(context)
         val n = NotificationCompat.Builder(context, MESSAGES_CHANNEL)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
-            .setContentTitle(from).setContentText(body)
+            .setContentTitle(title).setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(open(context)).setAutoCancel(true).build()
         context.getSystemService(NotificationManager::class.java).notify(from.hashCode(), n)

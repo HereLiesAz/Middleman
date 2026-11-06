@@ -22,12 +22,15 @@ class AndroidTextBridge(private val activity: ComponentActivity) : TextBridge {
     private val _ready = MutableStateFlow(isDefault())
     override val ready: StateFlow<Boolean> = _ready
 
-    private val notifications = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val permissions = activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     private val role = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         refresh()
-        if (_ready.value && Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
-            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        // Notifications for incoming texts, and contacts so they show as names. Neither is needed to carry a mediation.
+        val wanted = buildList {
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+            add(Manifest.permission.READ_CONTACTS)
+        }.filterNot(::granted)
+        if (_ready.value && wanted.isNotEmpty()) permissions.launch(wanted.toTypedArray())
     }
 
     /** Call when the activity returns to the foreground: the user may have changed the default in Settings. */
