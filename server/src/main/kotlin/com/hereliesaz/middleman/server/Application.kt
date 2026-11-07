@@ -51,6 +51,7 @@ import kotlin.time.Duration.Companion.seconds
  * | `PUBLIC_URL`        | `https://middleman.hereliesaz.com` | base of shareable invite links      |
  * | `WEB_ROOT`          |                    | directory of the built web app to serve           |
  * | `ANDROID_CERT_SHA256` |                  | comma-separated signing-cert fingerprints for App Links |
+ * | `APPLE_APP_IDS`     |                    | comma-separated `TEAMID.bundleid` for iOS universal links |
  */
 fun main() {
     val env = System.getenv()
@@ -66,6 +67,7 @@ fun main() {
             corsOrigins = env["CORS_ORIGINS"],
             webRoot = env["WEB_ROOT"]?.let(::File)?.takeIf { it.isDirectory },
             androidCertSha256 = env["ANDROID_CERT_SHA256"]?.split(',')?.map(String::trim)?.filter(String::isNotEmpty).orEmpty(),
+            appleAppIds = env["APPLE_APP_IDS"]?.split(',')?.map(String::trim)?.filter(String::isNotEmpty).orEmpty(),
         )
         // Expiry is a promise to delete; keep it even when nobody is looking.
         launch { while (true) { runCatching { service.sweepExpired() }; delay(60_000) } }
@@ -97,6 +99,7 @@ fun Application.middleman(
     corsOrigins: String? = null,
     webRoot: File? = null,
     androidCertSha256: List<String> = emptyList(),
+    appleAppIds: List<String> = emptyList(),
 ) {
     install(ContentNegotiation) { json(MiddlemanJson) }
     install(WebSockets) { pingPeriod = 20.seconds }
@@ -117,6 +120,6 @@ fun Application.middleman(
     }
     routing {
         middlemanRoutes(service, store)
-        webRoutes(webRoot, androidCertSha256)
+        webRoutes(webRoot, androidCertSha256, appleAppIds)
     }
 }

@@ -1,6 +1,7 @@
 package com.hereliesaz.middleman
 
 import androidx.compose.ui.window.ComposeUIViewController
+import com.hereliesaz.middleman.api.inviteCodeFrom
 import com.hereliesaz.middleman.ui.App
 import platform.Foundation.NSUserDefaults
 import kotlin.experimental.ExperimentalNativeApi
@@ -17,4 +18,5 @@ private val defaultServer = if (Platform.isDebugBinary) "http://localhost:8080" 
 
 /** Entry point for the Xcode wrapper in `iosApp/`. */
 @Suppress("unused", "FunctionName")
-fun MainViewController() = ComposeUIViewController { App(DefaultsStore, defaultServer) }
+fun MainViewController(inviteUrl: String? = null) =
+    ComposeUIViewController { App(DefaultsStore, defaultServer, inviteUrl?.let(::inviteCodeFrom)) }

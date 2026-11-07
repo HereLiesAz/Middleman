@@ -73,13 +73,21 @@ fun Route.middlemanRoutes(service: MediationService, store: SessionStore) {
 
 /**
  * Invite links and the web app. `/j/<code>` serves the web app, which reads the code from its own
- * URL; on Android the same link opens the installed app, verified by `assetlinks.json`.
+ * URL; on Android the same link opens the installed app, verified by `assetlinks.json`, and on iOS by `apple-app-site-association`.
  */
-fun Route.webRoutes(webRoot: File?, androidCertSha256: List<String>) {
+fun Route.webRoutes(webRoot: File?, androidCertSha256: List<String>, appleAppIds: List<String> = emptyList()) {
     get("/.well-known/assetlinks.json") {
         val fingerprints = androidCertSha256.joinToString(",") { "\"$it\"" }
         call.respondText(
             """[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.hereliesaz.middleman","sha256_cert_fingerprints":[$fingerprints]}}]""",
+            ContentType.Application.Json,
+        )
+    }
+    // iOS universal links: invite links open the installed app. Served without a file extension, as Apple requires.
+    get("/.well-known/apple-app-site-association") {
+        val ids = appleAppIds.joinToString(",") { "\"$it\"" }
+        call.respondText(
+            """{"applinks":{"details":[{"appIDs":[$ids],"components":[{"/":"${Routes.INVITE_PREFIX}*"}]}]}}""",
             ContentType.Application.Json,
         )
     }

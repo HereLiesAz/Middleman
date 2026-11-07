@@ -40,7 +40,7 @@ class MediationApiTest {
         val db = File.createTempFile("middleman", ".db").apply { deleteOnExit() }
         val store = SqliteSessionStore(db.path)
         service = MediationService(store, HeuristicMediator, "https://middleman.test", clock = { now })
-        application { middleman(store, service, androidCertSha256 = listOf("AA:BB")) }
+        application { middleman(store, service, androidCertSha256 = listOf("AA:BB"), appleAppIds = listOf("TEAM123.com.hereliesaz.middleman")) }
         block(createClient { install(ContentNegotiation) { json(MiddlemanJson) } })
     }
 
@@ -148,5 +148,7 @@ class MediationApiTest {
     @Test fun appLinksAreDeclared() = withServer { c ->
         val body = c.get("/.well-known/assetlinks.json").bodyAsText()
         assertTrue("com.hereliesaz.middleman" in body && "AA:BB" in body, body)
+        val apple = c.get("/.well-known/apple-app-site-association").bodyAsText()
+        assertTrue("TEAM123.com.hereliesaz.middleman" in apple && "/j/*" in apple, apple)
     }
 }
