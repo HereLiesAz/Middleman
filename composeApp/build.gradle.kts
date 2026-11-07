@@ -47,7 +47,7 @@ compose.desktop {
     application {
         mainClass = "com.hereliesaz.middleman.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "Middleman"
             // jlink keeps only the modules it can see; Ktor reaches for a few (naming, unsupported) at runtime.
             includeAllModules = true
