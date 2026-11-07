@@ -107,3 +107,6 @@ Nothing from a mediation is written to the system SMS store.
 - Desktop screenshot against a live server: relay labels, "not passed on", and the header copy render correctly. The withheld
   reason was shown twice, so the duplicate under the message was cut to a label.
 - "Settled" state is held in memory and resets on server restart, so judgment has to be earned again. That's deliberate.
+
+## Desktop installers
+- [x] Released through the central `multi-platform-app-release` workflow (contract `.github/workflows/desktop-release.yml`, profile in HereLiesAz/workflows); tag `desktop-v<major.minor.patch>`. Windows/macOS packaging is unverified until the first run.
