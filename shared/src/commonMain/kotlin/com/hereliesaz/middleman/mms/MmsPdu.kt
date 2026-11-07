@@ -30,8 +30,12 @@ object Mms {
         MmsMessage(h.from, h.to, h.subject, h.date, if (h.hasBody) readParts(r) else emptyList())
     }.getOrNull()
 
-    /** Builds an `m-send-req`. [to] are bare numbers; each part's bytes are carried as they are. */
-    fun buildSendReq(to: List<String>, subject: String?, parts: List<MmsPart>, transactionId: String): ByteArray {
+    /**
+     * Builds an `m-send-req`. [to] are bare numbers; each part's bytes are carried as they are.
+     * With [smil] (the default) a layout part comes first and the message is `multipart.related`, which is
+     * what carriers' gateways and other phones' messaging apps expect of a picture message.
+     */
+    fun buildSendReq(to: List<String>, subject: String?, parts: List<MmsPart>, transactionId: String, smil: Boolean = true): ByteArray {
         val out = Writer()
         out.byte(0x8C); out.byte(SEND_REQ)
         out.byte(0x98); out.text(transactionId)
@@ -39,10 +43,18 @@ object Mms {
         out.byte(0x89); out.byte(0x01); out.byte(0x81)  // From: the network fills in the sender
         to.forEach { out.byte(0x97); out.text("$it/TYPE=PLMN") }
         if (!subject.isNullOrEmpty()) { out.byte(0x96); out.encodedString(subject) }
-        out.byte(0x84); out.byte(0xA3)                  // Content-Type: application/vnd.wap.multipart.mixed
-        out.uintvar(parts.size)
-        parts.forEachIndexed { i, part ->
-            val name = part.name ?: "part$i"
+        val named = parts.mapIndexed { i, p -> MmsPart(p.contentType, p.name ?: "part$i", p.data) }
+        val all = if (smil) listOf(MmsPart("application/smil", "smil.xml", smilFor(named).encodeToByteArray())) + named else named
+        out.byte(0x84)                                  // Content-Type
+        if (smil) {
+            // multipart.related, whose first part (the layout) starts it: type="application/smil" start="<smil.xml>"
+            val value = Writer().apply { byte(0xB3); byte(0x89); text("application/smil"); byte(0x8A); text("<smil.xml>") }.bytes()
+            if (value.size < 31) out.byte(value.size) else { out.byte(31); out.uintvar(value.size) } // 31 means a length follows
+            out.raw(value)
+        } else out.byte(0xA3)                           // multipart.mixed
+        out.uintvar(all.size)
+        all.forEachIndexed { _, part ->
+            val name = part.name!!
             val headers = Writer().apply {
                 text(part.contentType)
                 byte(0x8E); text(name)                  // Content-Location
@@ -52,6 +64,21 @@ object Mms {
             out.raw(headers); out.raw(part.data)
         }
         return out.bytes()
+    }
+
+    /** A one-slide layout: the picture above, the words below, shown together. */
+    private fun smilFor(parts: List<MmsPart>): String {
+        val media = parts.joinToString("") {
+            when {
+                it.contentType.startsWith("image/") -> """<img src="${it.name}" region="Image"/>"""
+                it.contentType.startsWith("text/") -> """<text src="${it.name}" region="Text"/>"""
+                else -> ""
+            }
+        }
+        return """<smil><head><layout><root-layout width="320" height="480"/>""" +
+            """<region id="Image" fit="meet" top="0" left="0" height="80%" width="100%"/>""" +
+            """<region id="Text" top="80%" left="0" height="20%" width="100%"/></layout></head>""" +
+            """<body><par dur="5000ms">$media</par></body></smil>"""
     }
 
     // ---- reading ----

@@ -49,6 +49,8 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Middleman"
+            // jlink keeps only the modules it can see; Ktor reaches for a few (naming, unsupported) at runtime.
+            includeAllModules = true
             packageVersion = "1.1.0"
         }
     }

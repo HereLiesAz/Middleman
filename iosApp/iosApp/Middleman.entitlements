@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Invite links (https://middleman.hereliesaz.com/j/<code>) open the app. The server's apple-app-site-association file completes the pairing. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:middleman.hereliesaz.com</string>
+	</array>
+</dict>
+</plist>

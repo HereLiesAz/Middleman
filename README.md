@@ -54,6 +54,7 @@ All settings come from environment variables.
 | `PUBLIC_URL`        | `https://middleman.hereliesaz.com` | Base of shareable invite links |
 | `WEB_ROOT`          |                      | Built web app (`composeApp/build/dist/wasmJs/productionExecutable`) to serve, including `/j/<code>` |
 | `ANDROID_CERT_SHA256` |                    | Comma-separated signing-certificate fingerprints, published in `/.well-known/assetlinks.json` so invite links open the Android app |
+| `APPLE_APP_IDS`     |                      | Comma-separated `TEAMID.bundleid` (e.g. `ABCDE12345.com.hereliesaz.middleman`), published in `/.well-known/apple-app-site-association` so invite links open the iOS app |
 
 The heuristic mediator works offline, and it's the floor under both AI providers: a timeout, an error, or a refusal from the model falls back to it, so a reply always arrives.
 
@@ -104,5 +105,5 @@ Android only; iOS lets no app handle texts. Starting a mediation takes an option
 - **Messaging screens.** Conversation list, thread and a compose box over the system message store, with contact names, sent and delivered marks (`✓`, `✗ not sent`), and picture messages.
 - **Picture messages (MMS).** The binary format is read and written by `shared/.../mms/MmsPdu.kt`, tested against hand-built PDUs. Middleman downloads incoming pictures, files them in the system store, and sends pictures shrunk to about 280 KB. A picture from someone in a mediation is not carried; they are told Middleman only carries words. Sent messages carry no SMIL layout part; some carriers may want one.
 - **Not tested on a device.** The bridge and the MMS codec are tested. The default-app role, carrier sending, downloading and sending pictures, and the foreground service need a phone and a real carrier.
-- **Play.** SMS permissions are allowed only for apps that really are the default handler, and need Google's Permissions Declaration Form.
+- **Play.** SMS permissions are allowed only for apps that really are the default handler, and need Google's Permissions Declaration Form. A draft of the answers is in `docs/PLAY_SMS_DECLARATION.md`.
 - **Limit.** Android caps the keep-alive service at a few hours at a stretch. If the system stops it, the next text or opening the app resumes the bridge.
