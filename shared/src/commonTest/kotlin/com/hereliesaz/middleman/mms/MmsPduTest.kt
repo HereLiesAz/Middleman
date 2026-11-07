@@ -60,8 +60,17 @@ class MmsPduTest {
         val m = assertNotNull(Mms.parseRetrieveConf(pdu))
         assertEquals(listOf("+15045550100"), m.to)
         assertEquals("hello", m.subject)
-        assertEquals(listOf("t.txt", "a.jpg"), m.parts.map { it.name })
-        assertContentEquals(img, m.parts[1].data)
+        assertEquals(listOf("smil.xml", "t.txt", "a.jpg"), m.parts.map { it.name })
+        assertEquals("application/smil", m.parts[0].contentType)
+        val layout = m.parts[0].data.decodeToString()
+        assertEquals(true, "src=\"a.jpg\"" in layout && "src=\"t.txt\"" in layout)
+        assertContentEquals(img, m.parts[2].data)
+    }
+
+    @Test fun smilCanBeLeftOut() {
+        val pdu = Mms.buildSendReq(listOf("+15045550100"), null, listOf(MmsPart("text/plain", "t.txt", "hi".encodeToByteArray())), "TX2", smil = false)
+        pdu[1] = 0x84.toByte()
+        assertEquals(listOf("t.txt"), assertNotNull(Mms.parseRetrieveConf(pdu)).parts.map { it.name })
     }
 
     @Test fun garbageIsRefusedNotThrown() {
