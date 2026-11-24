@@ -14,6 +14,12 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        maven("https://raw.githubusercontent.com/HereLiesAz/AzNavRail/update-maven/") {
+            content {
+                includeModule("com.github.HereLiesAz.AzNavRail", "aznavrail-updates")
+                includeModule("com.github.HereLiesAz.AzNavRail", "aznavrail-updates-play")
+            }
+        }
         google()
         maven("https://maven-central.storage-download.googleapis.com/maven2/")
         mavenCentral()

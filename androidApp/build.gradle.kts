@@ -9,7 +9,15 @@ plugins {
 val version = Properties().apply { rootProject.file("version.properties").inputStream().use(::load) }
 fun v(key: String) = version.getProperty(key, "0").toInt()
 
+// Play builds opt in explicitly; the central Play release supplies releaseVersionCode.
+val playUpdates = providers.gradleProperty("azPlayUpdates").map { it.toBooleanStrict() }
+    .orElse(providers.gradleProperty("releaseVersionCode").map { true }).orElse(false)
+
 android {
+    sourceSets.getByName("main").kotlin.srcDir(
+        if (playUpdates.get()) "src/playUpdates/kotlin" else "src/githubUpdates/kotlin"
+    )
+
     namespace = "com.hereliesaz.middleman"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -59,6 +67,8 @@ android {
 kotlin { jvmToolchain(21) }
 
 dependencies {
+    implementation("com.github.HereLiesAz.AzNavRail:aznavrail-updates:12.5")
+    if (playUpdates.get()) implementation("com.github.HereLiesAz.AzNavRail:aznavrail-updates-play:12.5")
     implementation(projects.composeApp)
     implementation(libs.androidx.activity.compose)
     implementation(libs.compose.runtime)
