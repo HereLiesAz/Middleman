@@ -77,12 +77,14 @@ docker run -p 8080:8080 -v middleman-data:/data -e MEDIATOR=claude -e ANTHROPIC_
 - Deleting a session cascades to its device index and tokens, and SQLite's `secure_delete` overwrites the freed pages.
 - "The same people" is decided by anonymous per-install device ids, never by names, phone numbers or accounts.
 
+Android release builds check for updates using AzNavRail 12.5. GitHub checks send no session data, texts, contacts, or identifiers from the app. Play builds use Google Play's update API.
+
 ## Releasing to Google Play
 
 ~~~bash
 MIDDLEMAN_KEYSTORE=/path/release.jks \
 MIDDLEMAN_KEYSTORE_PASSWORD=… MIDDLEMAN_KEY_ALIAS=… MIDDLEMAN_KEY_PASSWORD=… \
-./gradlew :androidApp:bundleRelease -Pmiddleman.server=https://your-server
+./gradlew :androidApp:bundleRelease -PazPlayUpdates=true -Pmiddleman.server=https://your-server
 ~~~
 
 The output is `androidApp/build/outputs/bundle/release/androidApp-release.aab`. `versionCode` and `versionName` come from `version.properties`. Release builds are minified with R8 and forbid cleartext traffic.
